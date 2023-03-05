@@ -1,14 +1,18 @@
 #[macro_use]
 extern crate rocket;
 
+mod client;
 mod protos;
 mod store;
+mod responders;
+mod into_inner;
 
-use protos::user::Creative;
+use protos::imagefork::Poster;
+use responders::ProtoTextProtoJson;
 use rocket::response::Redirect;
-use rocket::serde::json::Json;
 use rocket::State;
 use store::Store;
+use thiserror::Error;
 
 #[get("/render?<width>&<aspect>&<noonce>&<panel_id>&<creative_id>")]
 fn index(
@@ -28,20 +32,32 @@ fn index(
     ))
 }
 
-#[post("/creative", format = "json", data = "<creative>")]
-fn new_creative(store: &State<Store>, mut creative: Json<Creative>) -> Json<Creative> {
+#[post("/creative", data = "<creative>")]
+fn new_creative(store: &State<Store>, mut creative: ProtoTextProtoJson<Poster>) -> ProtoTextProtoJson<Poster> {
     store.set(&mut creative).unwrap();
     creative
 }
 
 #[get("/creative/<id>")]
-fn get_creative(store: &State<Store>, id: u64) -> Option<Json<Creative>> {
+fn get_creative(store: &State<Store>, id: u64) -> Option<ProtoTextProtoJson<Poster>> {
     store.get(id).unwrap().map(Into::into)
 }
 
-#[launch]
-fn rocket() -> _ {
-    rocket::build()
-        .manage(store::Store::new("data.sled").unwrap())
+#[derive(Error, Debug)]
+enum Error {
+    #[error("Store: {0}")]
+    Store(#[from] store::Error),
+    #[error("Rocket: {0}")]
+    Rocket(#[from] rocket::Error),
+}
+
+#[rocket::main]
+async fn main() -> Result<(), Error> {
+    let _ = rocket::build()
+        .manage(store::Store::new("data")?)
         .mount("/", routes![index, new_creative, get_creative])
+        .mount("/", client::StaticClientFiles::new())
+        .launch()
+        .await?;
+    Ok(())
 }

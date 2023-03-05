@@ -1,7 +1,7 @@
 use protobuf::Message;
 use sled::Db;
 
-use crate::protos::user::Creative;
+use crate::protos::Poster;
 
 pub struct Store {
     db: Db,
@@ -24,18 +24,18 @@ impl Store {
         })
     }
 
-    pub fn get(&self, id: u64) -> Result<Option<Creative>> {
-        if let Some(data) = self.db.get(id.to_le_bytes())? {
-          Ok(Some(Creative::parse_from_bytes(&data)?))
+    pub fn get(&self, id: u64) -> Result<Option<Poster>> {
+        if let Some(data) = self.db.get(id.to_be_bytes())? {
+          Ok(Some(Poster::parse_from_bytes(&data)?))
         } else {
           Ok(None)
         }
     }
 
-    pub fn set(&self, value: &mut Creative) -> Result<()> {
+    pub fn set(&self, value: &mut Poster) -> Result<()> {
         value.id = self.db.generate_id()?;
         let data = value.write_to_bytes()?;
-        self.db.insert(value.id.to_le_bytes(), data.as_slice())?;
+        self.db.insert(value.id.to_be_bytes(), data.as_slice())?;
         Ok(())
     }
 }

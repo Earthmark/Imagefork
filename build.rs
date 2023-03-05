@@ -1,3 +1,5 @@
+use std::fs;
+
 use protobuf::descriptor::field_descriptor_proto::Type;
 use protobuf::reflect::FieldDescriptor;
 use protobuf::reflect::MessageDescriptor;
@@ -10,7 +12,8 @@ fn main() {
 
     impl CustomizeCallback for GenSerde {
         fn message(&self, _message: &MessageDescriptor) -> Customize {
-            Customize::default().before("#[derive(::rocket::serde::Serialize, ::rocket::serde::Deserialize)]")
+            Customize::default()
+                .before("#[derive(::rocket::serde::Serialize, ::rocket::serde::Deserialize)]")
         }
 
         fn field(&self, field: &FieldDescriptor) -> Customize {
@@ -28,11 +31,17 @@ fn main() {
         }
     }
 
+    let files: Vec<_> = fs::read_dir("proto")
+        .unwrap()
+        .filter_map(|f| f.ok())
+        .map(|f| f.path())
+        .collect();
+
     Codegen::new()
         .pure()
         .cargo_out_dir("protos")
         .customize_callback(GenSerde)
         .include("proto")
-        .inputs(&["proto/user.proto"])
+        .inputs(&files)
         .run_from_script();
 }

@@ -1,2 +1,4 @@
-/target
-/data.sled
+/target/
+/client/target/
+/data/
+/client/dist/
