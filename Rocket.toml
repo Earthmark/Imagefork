@@ -1,0 +1,11 @@
+[default.databases.imagefork]
+url = "data/portal/db.sqlite"
+
+[default.databases.redirects]
+url = "data/serving"
+
+[default.oauth.github]
+provider = "GitHub"
+client_id = "..."
+client_secret = "..."
+redirect_uri = "http://localhost:8000/auth/github"

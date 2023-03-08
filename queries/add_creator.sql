@@ -1,0 +1,3 @@
+INSERT INTO Creators (Email)
+SELECT ?
+RETURNING *;

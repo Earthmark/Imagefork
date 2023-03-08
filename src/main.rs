@@ -2,17 +2,27 @@
 extern crate rocket;
 
 mod client;
-mod protos;
-mod store;
-mod responders;
+mod image_meta;
 mod into_inner;
+mod portal;
+mod store;
 
-use protos::imagefork::Poster;
-use responders::ProtoTextProtoJson;
-use rocket::response::Redirect;
-use rocket::State;
-use store::Store;
+use rocket::{fairing::AdHoc, response::Redirect};
+use rocket_db_pools::Database;
+use rocket_oauth2::OAuth2;
+use serde::{Deserialize, Serialize};
+use std::result::Result;
 use thiserror::Error;
+
+#[derive(Deserialize, Serialize)]
+pub struct Poster {
+    id: u64,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct Creator {
+    id: u32,
+}
 
 #[get("/render?<width>&<aspect>&<noonce>&<panel_id>&<creative_id>")]
 fn index(
@@ -32,17 +42,6 @@ fn index(
     ))
 }
 
-#[post("/creative", data = "<creative>")]
-fn new_creative(store: &State<Store>, mut creative: ProtoTextProtoJson<Poster>) -> ProtoTextProtoJson<Poster> {
-    store.set(&mut creative).unwrap();
-    creative
-}
-
-#[get("/creative/<id>")]
-fn get_creative(store: &State<Store>, id: u64) -> Option<ProtoTextProtoJson<Poster>> {
-    store.get(id).unwrap().map(Into::into)
-}
-
 #[derive(Error, Debug)]
 enum Error {
     #[error("Store: {0}")]
@@ -51,11 +50,41 @@ enum Error {
     Rocket(#[from] rocket::Error),
 }
 
+#[derive(Deserialize)]
+struct AppConfig {
+    url: String,
+}
+
+struct Github;
+
 #[rocket::main]
 async fn main() -> Result<(), Error> {
-    let _ = rocket::build()
-        .manage(store::Store::new("data")?)
-        .mount("/", routes![index, new_creative, get_creative])
+    let builder = rocket::build();
+    let config = builder
+        .figment()
+        .focus("databases")
+        .extract_inner::<AppConfig>("redirects")
+        .expect("Sled config");
+
+    let _ = builder
+        .manage(store::Store::new(&config.url)?)
+        .attach(portal::Imagefork::init())
+        .manage(image_meta::ImageMetadata::default())
+        .attach(AdHoc::try_on_ignite(
+            "Migrate ImageFork",
+            portal::Imagefork::run_migrations,
+        ))
+        .attach(OAuth2::<Github>::fairing("github"))
+        .mount(
+            "/",
+            routes![
+                index,
+                portal::get_creator,
+                portal::new_creator,
+                portal::get_poster,
+                portal::new_poster
+            ],
+        )
         .mount("/", client::StaticClientFiles::new())
         .launch()
         .await?;
