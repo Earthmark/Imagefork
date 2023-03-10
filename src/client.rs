@@ -18,13 +18,15 @@ pub struct StaticClientFiles {
 }
 
 impl StaticClientFiles {
-    pub fn new() -> Self {
-        Self { rank: 10 }
-    }
-
     pub fn rank(mut self, rank: isize) -> Self {
         self.rank = rank;
         self
+    }
+}
+
+impl Default for StaticClientFiles {
+    fn default() -> Self {
+        Self { rank: 10 }
     }
 }
 

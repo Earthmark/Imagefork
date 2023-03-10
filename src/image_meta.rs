@@ -3,7 +3,7 @@ use sha2::{Digest, Sha256};
 use std::{fmt::Write, time::Duration};
 use thiserror::Error;
 
-use reqwest::{redirect::Policy, Client, ClientBuilder};
+use reqwest::{redirect::Policy, Client};
 
 pub struct ImageMetadata(Client);
 
@@ -40,7 +40,7 @@ fn get_size(b: &[u8]) -> Result<(u32, u32), Error> {
 
 fn get_hash(b: &[u8]) -> String {
     let mut hasher = Sha256::new();
-    hasher.update(&b);
+    hasher.update(b);
     let result = hasher.finalize();
     let mut s = String::with_capacity(2 * result.len());
     for byte in result {

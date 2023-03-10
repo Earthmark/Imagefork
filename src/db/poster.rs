@@ -28,24 +28,24 @@ impl Poster {
         poster_id: i64,
         creator_id: i64,
     ) -> Result<Option<Self>> {
-        Ok(sqlx::query_as!(
+        sqlx::query_as!(
             Self,
-            "SELECT * FROM Posters WHERE id = ? AND creator =  ?",
+            "SELECT * FROM Posters WHERE id = ? AND creator = ? LIMIT 1",
             poster_id,
             creator_id
         )
         .fetch_optional(&mut **db)
-        .await?)
+        .await
     }
 
     pub async fn get_all_by_creator(db: &mut Connection<Imagefork>, creator_id: i64) -> Result<Vec<Self>> {
-        Ok(sqlx::query_as!(
+        sqlx::query_as!(
           Self,
-            "SELECT * FROM Posters WHERE creator =  ?",
+            "SELECT * FROM Posters WHERE creator = ?",
             creator_id
         )
         .fetch_all(&mut **db)
-        .await?)
+        .await
     }
 
     pub async fn post(
@@ -54,7 +54,7 @@ impl Poster {
         url: &str,
         metadata: &Metadata,
     ) -> Result<Option<Self>> {
-        Ok(sqlx::query_as!(
+        sqlx::query_as!(
             Self,
             "INSERT INTO Posters (Creator, Url, Height, Width, Hash)
             SELECT ?, ?, ?, ?, ?
@@ -70,6 +70,6 @@ impl Poster {
             creator_id,
         )
         .fetch_optional(&mut **db)
-        .await?)
+        .await
     }
 }

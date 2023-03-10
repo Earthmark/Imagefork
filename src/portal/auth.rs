@@ -3,7 +3,7 @@ use rocket::request::{FromRequest, Outcome};
 use rocket::Request;
 use rocket_db_pools::{sqlx, Connection};
 
-use super::Result;
+use crate::Result;
 use crate::db::Imagefork;
 
 #[derive(Clone)]
@@ -61,7 +61,7 @@ impl<'r> FromRequest<'r> for ModeratorToken<'r> {
     async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
         let creator = try_outcome!(request.guard::<&CreatorToken>().await);
         if creator.is_moderator() {
-            Outcome::Success(ModeratorToken(&creator))
+            Outcome::Success(ModeratorToken(creator))
         } else {
             Outcome::Forward(())
         }

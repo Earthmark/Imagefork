@@ -17,11 +17,40 @@ pub struct Creator {
 
 impl Creator {
     pub async fn get(db: &mut Connection<Imagefork>, id: i64) -> Result<Option<Self>> {
-        Ok(
-            sqlx::query_as!(Self, "SELECT * FROM Creators WHERE id = ?", id)
-                .fetch_optional(&mut **db)
-                .await?,
+        sqlx::query_as!(Self, "SELECT * FROM Creators WHERE id = ? LIMIT 1", id)
+            .fetch_optional(&mut **db)
+            .await
+    }
+
+    pub async fn get_or_create_by_email(
+        db: &mut Connection<Imagefork>,
+        email: &str,
+    ) -> Result<i64> {
+        struct CreatorId {
+            id: i64,
+        }
+        let id = if let Some(id) = sqlx::query_as!(
+            CreatorId,
+            "SELECT id FROM Creators WHERE email = ? LIMIT 1",
+            email
         )
+        .fetch_optional(&mut **db)
+        .await?
+        {
+            id
+        } else {
+            sqlx::query_as!(
+                CreatorId,
+                "INSERT INTO Creators (Email)
+                SELECT ?
+                RETURNING id;
+                ",
+                email
+            )
+            .fetch_one(&mut **db)
+            .await?
+        };
+        Ok(id.id)
     }
 
     pub async fn can_add_posters(

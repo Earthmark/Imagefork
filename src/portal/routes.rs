@@ -3,51 +3,35 @@ use crate::db::Creator;
 use crate::db::Imagefork;
 use crate::db::Poster;
 use crate::image_meta::ImageMetadata;
-use rocket::response::Responder;
 use rocket::serde::json::Json;
-use rocket::{http::Status, State};
-use rocket_db_pools::{sqlx, Connection};
-use serde::{Deserialize, Serialize};
-use thiserror::Error;
+use rocket::State;
+use rocket_db_pools::Connection;
+use serde::{Deserialize};
 
 pub fn routes() -> Vec<rocket::Route> {
     routes![
         get_creator,
-        post_creator,
         get_posters,
         get_poster,
         post_poster
     ]
 }
 
-#[derive(Error, Debug)]
-pub enum Error {
-    #[error("Sql: {0}")]
-    Sql(#[from] sqlx::Error),
-}
-
-impl<'r, 'o: 'r> Responder<'r, 'o> for Error {
-    fn respond_to(self, req: &'r rocket::Request<'_>) -> rocket::response::Result<'o> {
-        (Status::InternalServerError, self).respond_to(req)
-    }
-}
+use crate::Result;
 
 #[get("/creator")]
 async fn get_creator(
     mut db: Connection<Imagefork>,
     token: &CreatorToken,
-) -> Result<Option<Json<Creator>>, Error> {
+) -> Result<Option<Json<Creator>>> {
     Ok(Creator::get(&mut db, token.id).await?.map(Into::into))
 }
-
-#[post("/creator")]
-async fn post_creator() {}
 
 #[get("/poster")]
 async fn get_posters(
     token: &CreatorToken,
     mut db: Connection<Imagefork>,
-) -> Result<Json<Vec<Poster>>, Error> {
+) -> Result<Json<Vec<Poster>>> {
     Ok(Poster::get_all_by_creator(&mut db, token.id).await?.into())
 }
 
@@ -56,11 +40,11 @@ async fn get_poster(
     token: &CreatorToken,
     mut db: Connection<Imagefork>,
     id: i64,
-) -> Result<Option<Json<Poster>>, Error> {
+) -> Result<Option<Json<Poster>>> {
     Ok(Poster::get(&mut db, id, token.id).await?.map(Into::into))
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 struct PosterCreate {
     url: String,
 }
@@ -71,7 +55,7 @@ async fn post_poster(
     c: &State<ImageMetadata>,
     mut db: Connection<Imagefork>,
     poster: Json<PosterCreate>,
-) -> Result<Json<Poster>, Error> {
+) -> Result<Json<Poster>> {
     if token.lockout {
         todo!()
     }

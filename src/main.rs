@@ -9,11 +9,14 @@ mod into_inner;
 mod portal;
 mod store;
 
-use rocket::response::Redirect;
+use rocket::{
+    figment::providers::{Format, Toml},
+    http::Status,
+    log::private::warn,
+    response::{Redirect, Responder},
+    Config,
+};
 use rocket_db_pools::Database;
-use rocket_oauth2::OAuth2;
-use serde::{Deserialize};
-use std::result::Result;
 use thiserror::Error;
 
 #[get("/render?<width>&<aspect>&<noonce>&<panel_id>&<creative_id>")]
@@ -35,29 +38,32 @@ fn index(
 }
 
 #[derive(Error, Debug)]
-enum Error {
+pub enum Error {
     #[error("Store: {0}")]
     Store(#[from] store::Error),
+    #[error("Sql: {0}")]
+    Sqlx(#[from] sqlx::Error),
     #[error("Rocket: {0}")]
     Rocket(#[from] rocket::Error),
+    #[error("Reqwest: {0}")]
+    Reqwest(#[from] reqwest::Error),
+    #[error("System: {0}")]
+    SystemError(String),
 }
 
-#[derive(Deserialize)]
-struct AppConfig {
-    url: String,
+type Result<T> = std::result::Result<T, Error>;
+
+impl<'r, 'o: 'r> Responder<'r, 'o> for Error {
+    fn respond_to(self, request: &'r rocket::Request<'_>) -> rocket::response::Result<'o> {
+        warn!("Error: {}", self);
+        (Status::InternalServerError, "Internal server error.").respond_to(request)
+    }
 }
 
 #[rocket::main]
-async fn main() -> Result<(), Error> {
-    let builder = rocket::build();
-    let config = builder
-        .figment()
-        .focus("databases")
-        .extract_inner::<AppConfig>("redirects")
-        .expect("Sled config");
-
-    let _ = builder
-        .manage(store::Store::new(&config.url)?)
+async fn main() -> Result<()> {
+    let _ = rocket::custom(Config::figment().join(Toml::file("Secrets.toml").nested()))
+        .attach(store::fairing())
         .attach(db::Imagefork::init())
         .attach(db::Imagefork::init_migrations())
         .manage(image_meta::ImageMetadata::default())
@@ -66,7 +72,7 @@ async fn main() -> Result<(), Error> {
         .mount("/", auth::routes())
         .mount("/", portal::routes())
         .mount("/", routes![index])
-        .mount("/", client::StaticClientFiles::new())
+        .mount("/", client::StaticClientFiles::default())
         .launch()
         .await?;
     Ok(())
