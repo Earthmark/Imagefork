@@ -1,9 +1,9 @@
-use serde::{Deserialize, Serialize};
 use sled::Db;
 
 pub struct Store {
     db: Db,
 }
+
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("Sled: {0}")]

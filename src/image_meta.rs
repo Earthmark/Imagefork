@@ -10,7 +10,7 @@ pub struct ImageMetadata(Client);
 impl Default for ImageMetadata {
     fn default() -> Self {
         Self(
-            ClientBuilder::new()
+            Client::builder()
                 .redirect(Policy::limited(0))
                 .connect_timeout(Duration::from_secs(10))
                 .build()

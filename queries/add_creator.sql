@@ -1,3 +1,4 @@
 INSERT INTO Creators (Email)
-SELECT ?
+SELECT "00000"
 RETURNING *;
+

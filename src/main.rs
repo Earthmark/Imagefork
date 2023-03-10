@@ -1,28 +1,20 @@
 #[macro_use]
 extern crate rocket;
 
+mod auth;
 mod client;
+mod db;
 mod image_meta;
 mod into_inner;
 mod portal;
 mod store;
 
-use rocket::{fairing::AdHoc, response::Redirect};
+use rocket::response::Redirect;
 use rocket_db_pools::Database;
 use rocket_oauth2::OAuth2;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize};
 use std::result::Result;
 use thiserror::Error;
-
-#[derive(Deserialize, Serialize)]
-pub struct Poster {
-    id: u64,
-}
-
-#[derive(Deserialize, Serialize)]
-pub struct Creator {
-    id: u32,
-}
 
 #[get("/render?<width>&<aspect>&<noonce>&<panel_id>&<creative_id>")]
 fn index(
@@ -55,8 +47,6 @@ struct AppConfig {
     url: String,
 }
 
-struct Github;
-
 #[rocket::main]
 async fn main() -> Result<(), Error> {
     let builder = rocket::build();
@@ -68,23 +58,14 @@ async fn main() -> Result<(), Error> {
 
     let _ = builder
         .manage(store::Store::new(&config.url)?)
-        .attach(portal::Imagefork::init())
+        .attach(db::Imagefork::init())
+        .attach(db::Imagefork::init_migrations())
         .manage(image_meta::ImageMetadata::default())
-        .attach(AdHoc::try_on_ignite(
-            "Migrate ImageFork",
-            portal::Imagefork::run_migrations,
-        ))
-        .attach(OAuth2::<Github>::fairing("github"))
-        .mount(
-            "/",
-            routes![
-                index,
-                portal::get_creator,
-                portal::new_creator,
-                portal::get_poster,
-                portal::new_poster
-            ],
-        )
+        .manage(auth::AuthClient::default())
+        .attach(auth::fairing())
+        .mount("/", auth::routes())
+        .mount("/", portal::routes())
+        .mount("/", routes![index])
         .mount("/", client::StaticClientFiles::new())
         .launch()
         .await?;
