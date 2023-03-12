@@ -1,11 +1,14 @@
 mod creator;
 mod poster;
 
-use rocket::{fairing::{self, Fairing, AdHoc}, Build, Rocket};
+use rocket::{
+    fairing::{self, AdHoc, Fairing},
+    Build, Rocket,
+};
 use rocket_db_pools::{sqlx, Database};
 use sqlx::migrate;
 
-pub use creator::Creator;
+pub use creator::{Creator, CreatorToken};
 pub use poster::Poster;
 
 #[derive(Database)]
@@ -14,7 +17,7 @@ pub struct Imagefork(pub sqlx::SqlitePool);
 
 impl Imagefork {
     pub fn init_migrations() -> impl Fairing {
-      AdHoc::try_on_ignite("Migrate imagefork", Self::run_migrations)
+        AdHoc::try_on_ignite("Migrate imagefork", Self::run_migrations)
     }
 
     async fn run_migrations(rocket: Rocket<Build>) -> fairing::Result {

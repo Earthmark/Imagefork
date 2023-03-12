@@ -1,4 +1,3 @@
-mod auth;
-mod routes;
-
-pub use routes::routes;
+pub mod auth;
+pub mod creators;
+pub mod token;

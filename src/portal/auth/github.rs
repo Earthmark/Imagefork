@@ -1,28 +1,17 @@
-use reqwest::header::{HeaderMap, HeaderValue};
-use reqwest::{Client, StatusCode, Url};
+use reqwest::{StatusCode, Url};
 use rocket::fairing::Fairing;
 use rocket::http::CookieJar;
-use rocket::http::{private::cookie::CookieBuilder, Cookie};
 use rocket::response::Redirect;
 use rocket::State;
 use rocket_db_pools::Connection;
 use rocket_oauth2::{OAuth2, TokenResponse};
 use serde::Deserialize;
 
+use super::AuthClient;
 use crate::db::{Creator, Imagefork};
+use crate::portal::token::AuthToken;
 
 use crate::Result;
-
-pub struct AuthClient(Client);
-
-impl Default for AuthClient {
-    fn default() -> Self {
-        let mut headers = HeaderMap::default();
-        headers.append("Accept", HeaderValue::from_static("application/json"));
-        headers.append("User-Agent", HeaderValue::from_static("Earthmark-Imagefork"));
-        Self(Client::builder().default_headers(headers).build().unwrap())
-    }
-}
 
 struct GitHub;
 
@@ -31,12 +20,7 @@ pub fn fairing() -> impl Fairing {
 }
 
 pub fn routes() -> Vec<rocket::Route> {
-    routes![github_login, github_callback, force_login, force_logout]
-}
-
-#[get("/force-login/<id>")]
-fn force_login(jar: &CookieJar<'_>, id: i64) {
-    jar.add_private(CookieBuilder::new("creator_id", id.to_string()).finish());
+    routes![github_login, github_callback]
 }
 
 #[get("/login/github")]
@@ -85,12 +69,8 @@ async fn github_callback(
         ))?;
 
     let id = Creator::get_or_create_by_email(&mut db, &primary_email).await?;
-    jar.add_private(CookieBuilder::new("creator_id", id.to_string()).finish());
+
+    AuthToken::set_in_cookie_jar(id, jar);
 
     Ok(Redirect::to("/"))
-}
-
-#[get("/logout")]
-fn force_logout(jar: &CookieJar<'_>) {
-    jar.remove_private(Cookie::named("creator_id"));
 }
