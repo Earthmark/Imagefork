@@ -1,46 +1,19 @@
-use rocket::{
-    fairing::{self, AdHoc, Fairing},
-    Build, Rocket,
-};
-use serde::Deserialize;
-use sled::Db;
+use std::{future::Future, time::Duration};
 
-#[derive(Deserialize)]
-struct StoreConfig {
-    url: String,
+pub struct Cache(moka::future::Cache<i64, String>);
+
+impl Default for Cache {
+    fn default() -> Self {
+        let db = moka::future::Cache::builder()
+            .time_to_live(Duration::from_secs(60 * 60 * 24 * 3))
+            .time_to_idle(Duration::from_secs(60 * 60 * 24))
+            .build();
+        Self(db)
+    }
 }
 
-pub fn fairing() -> impl Fairing {
-    AdHoc::try_on_ignite("Store init", fairing_internal)
-}
-
-async fn fairing_internal(rocket: Rocket<Build>) -> fairing::Result {
-    let config: StoreConfig = rocket
-        .figment()
-        .focus("databases")
-        .extract_inner::<StoreConfig>("redirects")
-        .expect("Sled config");
-    Ok(rocket.manage(Store::new(config.url)))
-}
-
-pub struct Store {
-    db: Db,
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum Error {
-    #[error("Sled: {0}")]
-    Sled(#[from] sled::Error),
-    #[error("Serde: {0}")]
-    Serde(#[from] serde_json::Error),
-}
-
-type Result<T> = std::result::Result<T, Error>;
-
-impl Store {
-    pub fn new<P: AsRef<std::path::Path>>(path: P) -> Result<Self> {
-        Ok(Self {
-            db: sled::open(path)?,
-        })
+impl Cache {
+    pub async fn get_or_create(&self, token: i64, init: impl Future<Output = String>) -> String {
+        self.0.get_with(token, init).await
     }
 }

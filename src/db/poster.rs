@@ -38,14 +38,13 @@ impl Poster {
         .await
     }
 
-    pub async fn get_all_by_creator(db: &mut Connection<Imagefork>, creator_id: i64) -> Result<Vec<Self>> {
-        sqlx::query_as!(
-          Self,
-            "SELECT * FROM Posters WHERE creator = ?",
-            creator_id
-        )
-        .fetch_all(&mut **db)
-        .await
+    pub async fn get_all_by_creator(
+        db: &mut Connection<Imagefork>,
+        creator_id: i64,
+    ) -> Result<Vec<Self>> {
+        sqlx::query_as!(Self, "SELECT * FROM Posters WHERE creator = ?", creator_id)
+            .fetch_all(&mut **db)
+            .await
     }
 
     pub async fn post(
@@ -71,5 +70,13 @@ impl Poster {
         )
         .fetch_optional(&mut **db)
         .await
+    }
+
+    pub async fn get_url_of_approx(
+        _db: &mut Connection<Imagefork>,
+        _width: i32,
+        _aspect: f32,
+    ) -> Result<Option<String>> {
+        Ok(Some("err.png".to_string()))
     }
 }

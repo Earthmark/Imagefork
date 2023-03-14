@@ -16,18 +16,16 @@ use rocket::{
     Config,
 };
 use rocket_db_pools::Database;
-use rocket_dyn_templates::{Template};
+use rocket_dyn_templates::Template;
 use thiserror::Error;
 
-#[get("/")]
+#[get("/", format = "html")]
 fn index() -> Template {
-    Template::render("index", {})
+    Template::render("index", ())
 }
 
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("Cache: {0}")]
-    Cache(#[from] cache::Error),
     #[error("Sql: {0}")]
     Sqlx(#[from] sqlx::Error),
     #[error("Rocket: {0}")]
@@ -52,7 +50,7 @@ impl<'r, 'o: 'r> Responder<'r, 'o> for Error {
 #[rocket::main]
 async fn main() -> Result<()> {
     let _ = rocket::custom(Config::figment().join(Toml::file("Secrets.toml").nested()))
-        .attach(cache::fairing())
+        .manage(cache::Cache::default())
         .attach(db::Imagefork::init())
         .attach(db::Imagefork::init_migrations())
         .manage(image_meta::ImageMetadata::default())
@@ -64,7 +62,7 @@ async fn main() -> Result<()> {
         .mount("/", portal::auth::routes())
         .mount("/", portal::creators::routes())
         .mount("/", routes![index])
-        .mount("/redirect", routes![redirect::handler])
+        .mount("/redirect", redirect::routes())
         .launch()
         .await?;
     Ok(())

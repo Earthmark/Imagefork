@@ -1,7 +1,7 @@
 [default.databases.imagefork]
 url = "data/portal/db.sqlite"
 
-[default.databases.redirects]
+[default.databases.cache]
 url = "data/serving"
 
 [global.authToken]

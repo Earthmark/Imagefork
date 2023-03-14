@@ -45,7 +45,7 @@ pub struct AuthToken {
     created: DateTime<Utc>,
 }
 
-static TOKEN_COOKIE_NAME: &'static str = "token";
+static TOKEN_COOKIE_NAME: &str = "token";
 
 impl AuthToken {
     pub fn from_cookie_jar(cookie: &CookieJar) -> Option<Self> {
@@ -104,7 +104,7 @@ impl<'r> FromRequest<'r> for ModeratorToken<'r> {
 
     async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
         let creator = try_outcome!(request.guard::<&CreatorToken>().await);
-        if creator.moderator {
+        if creator.is_moderator() {
             Outcome::Success(ModeratorToken(creator))
         } else {
             Outcome::Forward(())

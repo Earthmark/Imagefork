@@ -15,12 +15,6 @@ pub struct Creator {
     poster_limit: i64,
 }
 
-pub struct CreatorToken {
-    pub id: i64,
-    pub lockout: bool,
-    pub moderator: bool,
-}
-
 impl Creator {
     pub async fn get(db: &mut Connection<Imagefork>, id: i64) -> Result<Option<Self>> {
         sqlx::query_as!(Self, "SELECT * FROM Creators WHERE id = ? LIMIT 1", id)
@@ -29,13 +23,13 @@ impl Creator {
     }
 
     pub async fn get_token(db: &mut Connection<Imagefork>, id: i64) -> Result<Option<CreatorToken>> {
-        Ok(sqlx::query_as!(
+        sqlx::query_as!(
             CreatorToken,
             "SELECT id, lockout, moderator FROM Creators WHERE id = ?",
             id
         )
         .fetch_optional(&mut **db)
-        .await?)
+        .await
     }
 
     pub async fn get_or_create_by_email(
@@ -79,7 +73,7 @@ impl Creator {
 
         Ok(sqlx::query_as!(
             CanAddPoster,
-            "SELECT poster_limit > (SELECT COUNT(*) FROM Posters WHERE creator = id) AS can_add
+            "SELECT poster_limit > (SELECT COUNT(*) FROM Posters WHERE creator = Creators.id) AS can_add
             FROM Creators WHERE id = ?
             LIMIT 1
             ",
@@ -88,5 +82,23 @@ impl Creator {
         .fetch_optional(&mut **db)
         .await?
         .map(|c| c.can_add > 0))
+    }
+}
+
+pub struct CreatorToken {
+    id: i64,
+    lockout: bool,
+    moderator: bool,
+}
+
+impl CreatorToken {
+    pub fn id(&self) -> i64 {
+        self.id
+    }
+    pub fn locked_out(&self) -> bool {
+        self.lockout
+    }
+    pub fn is_moderator(&self) -> bool {
+        self.moderator
     }
 }
