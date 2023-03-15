@@ -8,7 +8,7 @@ use rocket::{
 use rocket_db_pools::{sqlx, Database};
 use sqlx::migrate;
 
-pub use creator::{Creator, CreatorToken};
+pub use creator::{Creator, CreatorToken, LoginKind};
 pub use poster::Poster;
 
 #[derive(Database)]

@@ -5,12 +5,12 @@ use reqwest::Client;
 use rocket::http::CookieJar;
 use rocket::response::Redirect;
 
-use crate::portal::token::AuthToken;
+use crate::db::CreatorToken;
 
 pub struct AuthClient(Client);
 
 pub fn routes() -> Vec<rocket::Route> {
-  routes![force_login, force_logout]
+  routes![force_logout]
 }
 
 impl Default for AuthClient {
@@ -25,14 +25,8 @@ impl Default for AuthClient {
     }
 }
 
-#[get("/force-login/<id>")]
-fn force_login(jar: &CookieJar<'_>, id: i64) -> Redirect {
-    AuthToken::set_in_cookie_jar(id, jar);
-    Redirect::to("/")
-}
-
 #[get("/logout")]
 fn force_logout(jar: &CookieJar<'_>) -> Redirect {
-    AuthToken::remove_from_cookie_jar(jar);
+    CreatorToken::remove_from_cookie_jar(jar);
     Redirect::to("/")
 }

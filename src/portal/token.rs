@@ -1,14 +1,14 @@
-use chrono::{DateTime, Duration, Utc};
+use chrono::{Duration, Utc};
 use rocket::fairing::{AdHoc, Fairing};
 use rocket::http::{Cookie, CookieJar};
 use rocket::outcome::{try_outcome, IntoOutcome};
 use rocket::request::{FromRequest, Outcome};
 use rocket::{Build, Request, Rocket, State};
 use rocket_db_pools::Connection;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer};
 
-use crate::db::Imagefork;
-use crate::db::{Creator, CreatorToken};
+use crate::db::CreatorToken;
+use crate::db::{Imagefork, LoginKind};
 
 fn from_hours<'de, D>(d: D) -> std::result::Result<Duration, D::Error>
 where
@@ -39,27 +39,17 @@ async fn attach_config(rocket: Rocket<Build>) -> rocket::fairing::Result {
     }
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct AuthToken {
-    id: i64,
-    created: DateTime<Utc>,
-}
-
 static TOKEN_COOKIE_NAME: &str = "token";
 
-impl AuthToken {
-    pub fn from_cookie_jar(cookie: &CookieJar) -> Option<Self> {
+impl CreatorToken {
+    fn from_cookie_jar(cookie: &CookieJar) -> Option<String> {
         cookie
             .get_private(TOKEN_COOKIE_NAME)
-            .and_then(|cookie| serde_json::from_str::<Self>(cookie.value()).ok())
+            .and_then(|cookie| serde_json::from_str::<String>(cookie.value()).ok())
     }
 
-    pub fn set_in_cookie_jar(id: i64, cookie: &CookieJar) -> Self {
-        let created = Utc::now();
-        let token = Self { id, created };
-        let token_string = serde_json::to_string(&token).unwrap();
-        cookie.add_private(Cookie::new(TOKEN_COOKIE_NAME, token_string));
-        token
+    pub fn set_in_cookie_jar(&self, cookie: &CookieJar) {
+        cookie.add_private(Cookie::new(TOKEN_COOKIE_NAME, self.token.to_string()));
     }
 
     pub fn remove_from_cookie_jar(cookie: &CookieJar) {
@@ -78,15 +68,22 @@ impl<'r> FromRequest<'r> for &'r CreatorToken {
                 let cookies = request.cookies();
                 let config = request.guard::<&State<TokenConfig>>().await.succeeded()?;
 
-                if let Some(token) = AuthToken::from_cookie_jar(cookies) {
-                    let now = Utc::now();
-                    if token.created + config.life_limit < now {
-                        AuthToken::remove_from_cookie_jar(cookies);
-                        return None;
-                    } else if token.created + config.refresh_limit < now {
-                        AuthToken::set_in_cookie_jar(token.id, cookies);
+                if let Some(token) = CreatorToken::from_cookie_jar(cookies) {
+                    if let Some(token) = CreatorToken::get_by_token(&mut db, &token).await.ok()? {
+                        let now = Utc::now();
+                        if token.minting_time + config.life_limit < now {
+                            CreatorToken::remove_from_cookie_jar(cookies);
+                            None
+                        } else if token.minting_time + config.refresh_limit < now {
+                            CreatorToken::login(&mut db, LoginKind::Id(token.id))
+                                .await
+                                .ok()
+                        } else {
+                            Some(token)
+                        }
+                    } else {
+                        None
                     }
-                    Creator::get_token(&mut db, token.id).await.ok().flatten()
                 } else {
                     None
                 }
@@ -104,7 +101,7 @@ impl<'r> FromRequest<'r> for ModeratorToken<'r> {
 
     async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
         let creator = try_outcome!(request.guard::<&CreatorToken>().await);
-        if creator.is_moderator() {
+        if creator.moderator {
             Outcome::Success(ModeratorToken(creator))
         } else {
             Outcome::Forward(())
