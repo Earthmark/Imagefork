@@ -31,7 +31,7 @@ async fn get_creator(
     mut db: Connection<Imagefork>,
     token: &CreatorToken,
 ) -> Result<Option<Json<Creator>>> {
-    Ok(Creator::get(&mut db, token.id()).await?.map(Into::into))
+    Ok(Creator::get(&mut db, token.id).await?.map(Into::into))
 }
 
 #[get("/creator", format = "json", rank = 2)]
@@ -44,9 +44,7 @@ async fn get_posters(
     token: &CreatorToken,
     mut db: Connection<Imagefork>,
 ) -> Result<Json<Vec<Poster>>> {
-    Ok(Poster::get_all_by_creator(&mut db, token.id())
-        .await?
-        .into())
+    Ok(Poster::get_all_by_creator(&mut db, token.id).await?.into())
 }
 
 #[get("/poster", format = "json", rank = 2)]
@@ -60,7 +58,7 @@ async fn get_poster(
     mut db: Connection<Imagefork>,
     id: i64,
 ) -> Result<Option<Json<Poster>>> {
-    Ok(Poster::get(&mut db, id, token.id()).await?.map(Into::into))
+    Ok(Poster::get(&mut db, id, token.id).await?.map(Into::into))
 }
 
 #[get("/poster/<_>", format = "json", rank = 2)]
@@ -80,16 +78,16 @@ async fn post_poster(
     mut db: Connection<Imagefork>,
     poster: Json<PosterCreate>,
 ) -> Result<Either<Json<Poster>, (Status, ())>> {
-    if token.locked_out() {
+    if token.lockout {
         return Ok(Either::Right((Status::Unauthorized, ())));
     }
 
-    if Creator::can_add_posters(&mut db, token.id()).await? != Some(true) {
+    if Creator::can_add_posters(&mut db, token.id).await? != Some(true) {
         return Ok(Either::Right((Status::Forbidden, ())));
     }
 
     let metadata = c.get_metadata(&poster.url).await.unwrap();
-    let poster = Poster::post(&mut db, token.id(), &poster.url, &metadata)
+    let poster = Poster::post(&mut db, token.id, &poster.url, &metadata)
         .await?
         .ok_or(crate::Error::SystemError(
             "Failed to create poster.".to_string(),
