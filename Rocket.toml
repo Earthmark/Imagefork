@@ -1,3 +1,6 @@
 [global.authToken]
 life_limit = 24
 refresh_limit = 3
+
+[global.tokens]
+token_keepalive_minutes = 1440 # one day (60 * 24)

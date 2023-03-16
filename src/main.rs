@@ -7,6 +7,9 @@ mod into_inner;
 mod portal;
 mod redirect;
 mod cache;
+mod config;
+
+use config::bind;
 
 use rocket::{
     figment::providers::{Format, Toml},
@@ -17,6 +20,7 @@ use rocket::{
 };
 use rocket_db_pools::Database;
 use rocket_dyn_templates::Template;
+use rocket_oauth2::OAuth2;
 use thiserror::Error;
 
 #[get("/", format = "html")]
@@ -57,9 +61,10 @@ async fn main() -> Result<()> {
         .attach(db::Imagefork::init_migrations())
         .manage(image_meta::ImageMetadata::default())
         .manage(portal::auth::AuthClient::default())
-        .attach(portal::auth::github::fairing())
+        .attach(OAuth2::<portal::auth::github::GitHub>::fairing("github"))
         .mount("/", portal::auth::github::routes())
-        .attach(portal::token::fairing())
+        .attach(bind::<portal::token::TokenConfig>("authToken"))
+        .attach(bind::<cache::TokenCacheConfig>("tokens"))
         .attach(Template::fairing())
         .mount("/", portal::auth::routes())
         .mount("/", portal::creators::routes())

@@ -1,5 +1,4 @@
 use reqwest::{StatusCode, Url};
-use rocket::fairing::Fairing;
 use rocket::http::CookieJar;
 use rocket::response::Redirect;
 use rocket::State;
@@ -12,11 +11,7 @@ use crate::db::{CreatorToken, Imagefork};
 
 use crate::Result;
 
-struct GitHub;
-
-pub fn fairing() -> impl Fairing {
-    OAuth2::<GitHub>::fairing("github")
-}
+pub struct GitHub;
 
 pub fn routes() -> Vec<rocket::Route> {
     routes![github_login, github_callback]

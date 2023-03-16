@@ -1,9 +1,8 @@
 use chrono::{Duration, Utc};
-use rocket::fairing::{AdHoc, Fairing};
 use rocket::http::{Cookie, CookieJar};
 use rocket::outcome::{try_outcome, IntoOutcome};
 use rocket::request::{FromRequest, Outcome};
-use rocket::{Build, Request, Rocket, State};
+use rocket::{Request, State};
 use rocket_db_pools::Connection;
 use serde::{Deserialize, Deserializer};
 
@@ -18,25 +17,11 @@ where
 }
 
 #[derive(Deserialize)]
-struct TokenConfig {
+pub struct TokenConfig {
     #[serde(deserialize_with = "from_hours")]
     life_limit: Duration,
     #[serde(deserialize_with = "from_hours")]
     refresh_limit: Duration,
-}
-
-pub fn fairing() -> impl Fairing {
-    AdHoc::try_on_ignite("AuthToken Config", attach_config)
-}
-
-async fn attach_config(rocket: Rocket<Build>) -> rocket::fairing::Result {
-    match rocket.figment().extract_inner::<TokenConfig>("authToken") {
-        Ok(config) => Ok(rocket.manage(config)),
-        Err(e) => {
-            warn!("Failed to find config: {}", e);
-            Err(rocket)
-        }
-    }
 }
 
 static TOKEN_COOKIE_NAME: &str = "token";
