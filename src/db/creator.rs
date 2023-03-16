@@ -9,22 +9,9 @@ use sqlx::Result;
 pub struct CreatorToken {
     pub id: i64,
     pub token: String,
-    pub minting_time: DateTime<Utc>,
+    minting_time: NaiveDateTime,
     pub moderator: bool,
     pub lockout: bool,
-}
-
-struct OptionCreatorToken {
-    id: i64,
-    token: Option<String>,
-    minting_time: Option<NaiveDateTime>,
-    moderator: bool,
-    lockout: bool,
-}
-
-pub enum LoginKind<'a> {
-    Id(i64),
-    Email(&'a str),
 }
 
 fn generate_token() -> String {
@@ -34,77 +21,54 @@ fn generate_token() -> String {
 }
 
 impl CreatorToken {
-    fn from_option(token: OptionCreatorToken) -> Option<Self> {
-        match token {
-            OptionCreatorToken {
-                id,
-                moderator,
-                lockout,
-                token: Some(token),
-                minting_time: Some(minting_time),
-            } => Some(CreatorToken {
-                id,
-                moderator,
-                lockout,
-                token,
-                minting_time: DateTime::from_utc(minting_time, Utc),
-            }),
-            _ => None,
-        }
+    pub fn minting_time(&self) -> DateTime<Utc> {
+        DateTime::from_utc(self.minting_time, Utc)
     }
 
     pub async fn get_by_token(db: &mut Connection<Imagefork>, token: &str) -> Result<Option<Self>> {
         let token = sqlx::query_as!(
-            OptionCreatorToken,
-            "SELECT id, token, minting_time, moderator, lockout
-            FROM Creators WHERE token = ? LIMIT 1",
+            Self,
+            r#"SELECT id, token AS "token!", minting_time AS "minting_time!", moderator, lockout
+            FROM Creators WHERE token = $1 LIMIT 1"#,
             token
         )
         .fetch_optional(&mut **db)
         .await?;
 
-        Ok(token.and_then(CreatorToken::from_option))
+        Ok(token)
     }
 
-    pub async fn login(db: &mut Connection<Imagefork>, login: LoginKind<'_>) -> Result<Self> {
+    pub async fn relogin(db: &mut Connection<Imagefork>, id: i64) -> Result<Self> {
         let token = generate_token();
 
-        let now = Utc::now().naive_utc();
+        Ok(sqlx::query_as!(
+            Self,
+            r#"UPDATE Creators
+            SET token = $1, minting_time = (now() at time zone 'utc')
+            WHERE id = $2
+            RETURNING id, token AS "token!", minting_time AS "minting_time!", moderator, lockout"#,
+            token,
+            id
+        )
+        .fetch_optional(&mut **db)
+        .await?
+        .expect("failed to insert auth token"))
+    }
 
-        Ok(match login {
-            LoginKind::Id(id) => {
-                sqlx::query_as!(
-                    OptionCreatorToken,
-                    "UPDATE Creators
-                    SET token = ?, minting_time = ?
-                    WHERE id = ?
-                    RETURNING id, token, minting_time, moderator, lockout",
-                    token,
-                    now,
-                    id
-                )
-                .fetch_optional(&mut **db)
-                .await?
-            }
-            LoginKind::Email(email) => {
-                sqlx::query_as!(
-                    OptionCreatorToken,
-                    "INSERT OR IGNORE INTO Creators (Email) VALUES (?);
-                    UPDATE Creators
-                    SET token = ?, minting_time = ?
-                    WHERE email = ?
-                    RETURNING id, token, minting_time, moderator, lockout",
-                    email,
-                    token,
-                    now,
-                    email
-                )
-                .fetch_optional(&mut **db)
-                .await?
-            }
-        }
-        .and_then(CreatorToken::from_option)
-        .expect("failed to insert creation token"))
+    pub async fn login(db: &mut Connection<Imagefork>, email: &str) -> Result<Self> {
+        let token = generate_token();
+
+        Ok(sqlx::query_as!(
+            Self,
+            r#"INSERT INTO Creators (email, token, minting_time) VALUES ($1, $2, (now() at time zone 'utc'))
+            ON CONFLICT (email)
+            DO UPDATE SET token = $2, minting_time = (now() at time zone 'utc')
+            RETURNING id, token AS "token!", minting_time AS "minting_time!", moderator, lockout"#,
+            email,
+            token,
+        )
+        .fetch_one(&mut **db)
+        .await?)
     }
 }
 
@@ -115,7 +79,7 @@ pub struct Creator {
     creation_time: NaiveDateTime,
     lockout: bool,
     moderator: bool,
-    poster_limit: i64,
+    poster_limit: i32,
 }
 
 impl Creator {
@@ -123,7 +87,7 @@ impl Creator {
         sqlx::query_as!(
             Self,
             "SELECT id, email, creation_time, lockout, moderator, poster_limit
-            FROM Creators WHERE id = ? LIMIT 1",
+            FROM Creators WHERE id = $1 LIMIT 1",
             id
         )
         .fetch_optional(&mut **db)
@@ -135,19 +99,18 @@ impl Creator {
         creator_id: i64,
     ) -> Result<Option<bool>> {
         struct CanAddPoster {
-            can_add: i64,
+            can_add: bool,
         }
 
         Ok(sqlx::query_as!(
             CanAddPoster,
-            "SELECT poster_limit > (SELECT COUNT(*) FROM Posters WHERE creator = Creators.id) AS can_add
-            FROM Creators WHERE id = ?
-            LIMIT 1
-            ",
+            r#"SELECT poster_limit > (SELECT COUNT(*) FROM Posters WHERE creator = Creators.id) AS "can_add!"
+            FROM Creators WHERE id = $1
+            "#,
             creator_id,
         )
         .fetch_optional(&mut **db)
         .await?
-        .map(|c| c.can_add > 0))
+        .map(|c| c.can_add))
     }
 }

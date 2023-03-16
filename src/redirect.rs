@@ -1,4 +1,4 @@
-use rocket::{response::Redirect, Route, State};
+use rocket::{log::private::warn, response::Redirect, Route};
 use rocket_db_pools::Connection;
 
 use crate::{
@@ -27,7 +27,7 @@ async fn get_url_of_approx(db: &mut Connection<Imagefork>, width: i32, aspect: f
 #[get("/?<width>&<aspect>&<token>")]
 async fn handler(
     mut db: Connection<Imagefork>,
-    cache: &State<Cache>,
+    mut cache: Connection<Cache>,
     width: i32,
     aspect: f32,
     token: Option<i64>,
@@ -35,9 +35,12 @@ async fn handler(
     let url = match token {
         None | Some(0) => get_url_of_approx(&mut db, width, aspect).await,
         Some(token) => {
-            cache
-                .get_or_create(token, get_url_of_approx(&mut db, width, aspect))
+            Cache::get_or_create(&mut cache, token, get_url_of_approx(&mut db, width, aspect))
                 .await
+                .unwrap_or_else(|e| {
+                    warn!("cache error: {}", e);
+                    ERROR_IMAGE.to_string()
+                })
         }
     };
     Redirect::to(url)

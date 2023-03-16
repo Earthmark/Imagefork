@@ -4,13 +4,14 @@ use reqwest::header::{HeaderMap, HeaderValue};
 use reqwest::Client;
 use rocket::http::CookieJar;
 use rocket::response::Redirect;
+use rocket_db_pools::Connection;
 
-use crate::db::CreatorToken;
+use crate::db::{CreatorToken, Imagefork};
 
 pub struct AuthClient(Client);
 
 pub fn routes() -> Vec<rocket::Route> {
-  routes![force_logout]
+  routes![force_logout, force_login]
 }
 
 impl Default for AuthClient {
@@ -29,4 +30,11 @@ impl Default for AuthClient {
 fn force_logout(jar: &CookieJar<'_>) -> Redirect {
     CreatorToken::remove_from_cookie_jar(jar);
     Redirect::to("/")
+}
+
+#[get("/force-login/<id>")]
+async fn force_login(mut db: Connection<Imagefork>, jar: &CookieJar<'_>, id: i64) -> Result<Redirect, crate::Error> {
+    let token = CreatorToken::relogin(&mut db, id).await?;
+    token.set_in_cookie_jar(jar);
+    Ok(Redirect::to("/"))
 }

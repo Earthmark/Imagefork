@@ -8,7 +8,7 @@ use rocket_oauth2::{OAuth2, TokenResponse};
 use serde::Deserialize;
 
 use super::AuthClient;
-use crate::db::{CreatorToken, Imagefork, LoginKind};
+use crate::db::{CreatorToken, Imagefork};
 
 use crate::Result;
 
@@ -67,7 +67,7 @@ async fn github_callback(
             "Oauth did not resolve to a primary email".to_string(),
         ))?;
 
-    let token = CreatorToken::login(&mut db, LoginKind::Email(&primary_email)).await?;
+    let token = CreatorToken::login(&mut db, &primary_email).await?;
 
     token.set_in_cookie_jar(jar);
 

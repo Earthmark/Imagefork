@@ -34,6 +34,8 @@ pub enum Error {
     Reqwest(#[from] reqwest::Error),
     #[error("Serde Json: {0}")]
     SerdeJson(#[from] serde_json::Error),
+    #[error("Redis: {0}")]
+    Redis(#[from] rocket_db_pools::deadpool_redis::redis::RedisError),
     #[error("System: {0}")]
     SystemError(String),
 }
@@ -50,7 +52,7 @@ impl<'r, 'o: 'r> Responder<'r, 'o> for Error {
 #[rocket::main]
 async fn main() -> Result<()> {
     let _ = rocket::custom(Config::figment().join(Toml::file("Secrets.toml").nested()))
-        .manage(cache::Cache::default())
+        .attach(cache::Cache::init())
         .attach(db::Imagefork::init())
         .attach(db::Imagefork::init_migrations())
         .manage(image_meta::ImageMetadata::default())

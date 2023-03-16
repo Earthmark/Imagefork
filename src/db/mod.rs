@@ -8,12 +8,12 @@ use rocket::{
 use rocket_db_pools::{sqlx, Database};
 use sqlx::migrate;
 
-pub use creator::{Creator, CreatorToken, LoginKind};
+pub use creator::{Creator, CreatorToken};
 pub use poster::Poster;
 
 #[derive(Database)]
 #[database("imagefork")]
-pub struct Imagefork(pub sqlx::SqlitePool);
+pub struct Imagefork(pub sqlx::PgPool);
 
 impl Imagefork {
     pub fn init_migrations() -> impl Fairing {

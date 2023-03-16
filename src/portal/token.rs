@@ -8,7 +8,7 @@ use rocket_db_pools::Connection;
 use serde::{Deserialize, Deserializer};
 
 use crate::db::CreatorToken;
-use crate::db::{Imagefork, LoginKind};
+use crate::db::Imagefork;
 
 fn from_hours<'de, D>(d: D) -> std::result::Result<Duration, D::Error>
 where
@@ -45,7 +45,7 @@ impl CreatorToken {
     fn from_cookie_jar(cookie: &CookieJar) -> Option<String> {
         cookie
             .get_private(TOKEN_COOKIE_NAME)
-            .and_then(|cookie| serde_json::from_str::<String>(cookie.value()).ok())
+            .map(|cookie| cookie.value().to_string())
     }
 
     pub fn set_in_cookie_jar(&self, cookie: &CookieJar) {
@@ -71,13 +71,11 @@ impl<'r> FromRequest<'r> for &'r CreatorToken {
                 if let Some(token) = CreatorToken::from_cookie_jar(cookies) {
                     if let Some(token) = CreatorToken::get_by_token(&mut db, &token).await.ok()? {
                         let now = Utc::now();
-                        if token.minting_time + config.life_limit < now {
+                        if token.minting_time() + config.life_limit < now {
                             CreatorToken::remove_from_cookie_jar(cookies);
                             None
-                        } else if token.minting_time + config.refresh_limit < now {
-                            CreatorToken::login(&mut db, LoginKind::Id(token.id))
-                                .await
-                                .ok()
+                        } else if token.minting_time() + config.refresh_limit < now {
+                            CreatorToken::relogin(&mut db, token.id).await.ok()
                         } else {
                             Some(token)
                         }
