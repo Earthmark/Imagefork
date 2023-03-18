@@ -1,5 +1,6 @@
-mod creator;
-mod poster;
+pub mod creator;
+pub mod creator_token;
+pub mod poster;
 
 use rocket::{
     fairing::{self, AdHoc, Fairing},
@@ -8,7 +9,8 @@ use rocket::{
 use rocket_db_pools::{sqlx, Database};
 use sqlx::migrate;
 
-pub use creator::{Creator, CreatorToken};
+pub use creator::Creator;
+pub use creator_token::CreatorToken;
 pub use poster::Poster;
 
 #[derive(Database)]

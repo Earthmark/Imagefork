@@ -11,7 +11,7 @@ CREATE TABLE Creators (
 
 CREATE TABLE Posters (
   id BIGSERIAL PRIMARY KEY,
-  creator BIGSERIAL NOT NULL,
+  creator BIGSERIAL NOT NULL REFERENCES Creators (id) ON DELETE CASCADE,
   creation_time TIMESTAMP NOT NULL DEFAULT (now() at time zone 'utc'),
   url TEXT NOT NULL,
   height INTEGER NOT NULL DEFAULT 0,
@@ -22,6 +22,5 @@ CREATE TABLE Posters (
   start_time TIMESTAMP NOT NULL DEFAULT (now() at time zone 'utc'),
   end_time TIMESTAMP,
   stopped BOOLEAN NOT NULL DEFAULT FALSE,
-  lockout BOOLEAN NOT NULL DEFAULT FALSE,
-  FOREIGN KEY(Creator) REFERENCES Creators(id)
+  lockout BOOLEAN NOT NULL DEFAULT FALSE
 );

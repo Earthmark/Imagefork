@@ -89,3 +89,97 @@ impl Poster {
         .map(|f| f.url))
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::{
+        super::{creator::test::*, creator_token::test::*, Imagefork},
+        Poster,
+    };
+    use crate::test::TestRocket;
+    use crate::{db::Creator, image_meta::Metadata};
+    use rocket::serde::json::Json;
+    use rocket_db_pools::Connection;
+
+    #[get("/test/get-poster?<poster_id>&<creator_id>")]
+    pub async fn get_poster(
+        mut db: Connection<Imagefork>,
+        poster_id: i64,
+        creator_id: i64,
+    ) -> Option<Json<Poster>> {
+        Poster::get(&mut db, poster_id, creator_id)
+            .await
+            .unwrap()
+            .map(Into::into)
+    }
+
+    #[get("/test/get-all?<creator_id>")]
+    pub async fn get_all_for(mut db: Connection<Imagefork>, creator_id: i64) -> Json<Vec<Poster>> {
+        Poster::get_all_by_creator(&mut db, creator_id)
+            .await
+            .unwrap()
+            .into()
+    }
+
+    #[get("/test/add_poster?<creator_id>&<url>")]
+    pub async fn add_poster(
+        mut db: Connection<Imagefork>,
+        creator_id: i64,
+        url: &str,
+    ) -> Option<Json<Poster>> {
+        Poster::post(
+            &mut db,
+            creator_id,
+            url,
+            &Metadata {
+                height: 100,
+                width: 100,
+                hash: "AAAA".to_string(),
+            },
+        )
+        .await
+        .unwrap()
+        .map(Into::into)
+    }
+
+    #[test]
+    fn new_user_has_no_posters() {
+        let client = TestRocket::new(routes![
+            delete_creator,
+            login,
+            get_poster,
+            get_all_for,
+            add_poster
+        ])
+        .client();
+        let token = client.creator("p1");
+
+        let posters: Vec<Poster> = client.get_json(uri!(get_all_for(creator_id = token.id())));
+        assert!(posters.len() == 0);
+    }
+
+    #[test]
+    fn new_user_has_poster_limit() {
+        let client = TestRocket::new(routes![
+            delete_creator,
+            login,
+            get_creator,
+            get_poster,
+            get_all_for,
+            add_poster
+        ])
+        .client();
+        let token = client.creator("p1");
+
+        let creator: Creator = client.get_json(uri!(get_creator(id = token.id())));
+
+        for index in 0..creator.poster_limit {
+            client.get(uri!(add_poster(creator_id = token.id(), url = format!("poster {}", index))));
+        }
+
+        
+
+        let posters: Vec<Poster> = client.get_json(uri!(get_all_for(creator_id = token.id())));
+        assert!(posters.len() == 0);
+    }
+}

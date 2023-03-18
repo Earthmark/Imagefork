@@ -6,6 +6,7 @@ use rocket::{Request, State};
 use rocket_db_pools::Connection;
 use serde::{Deserialize, Deserializer};
 
+use crate::config::ConfigInfo;
 use crate::db::CreatorToken;
 use crate::db::Imagefork;
 
@@ -22,6 +23,16 @@ pub struct TokenConfig {
     life_limit: Duration,
     #[serde(deserialize_with = "from_hours")]
     refresh_limit: Duration,
+}
+
+impl ConfigInfo for TokenConfig {
+    fn field() -> &'static str {
+        "authToken"
+    }
+
+    fn name() -> &'static str {
+        "Config for auth token"
+    }
 }
 
 static TOKEN_COOKIE_NAME: &str = "token";
@@ -60,7 +71,7 @@ impl<'r> FromRequest<'r> for &'r CreatorToken {
                             CreatorToken::remove_from_cookie_jar(cookies);
                             None
                         } else if token.minting_time() + config.refresh_limit < now {
-                            CreatorToken::relogin(&mut db, token.id).await.ok()
+                            CreatorToken::relogin(&mut db, token.id).await.ok().flatten()
                         } else {
                             Some(token)
                         }

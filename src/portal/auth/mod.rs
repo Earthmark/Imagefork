@@ -34,7 +34,8 @@ fn force_logout(jar: &CookieJar<'_>) -> Redirect {
 
 #[get("/force-login/<id>")]
 async fn force_login(mut db: Connection<Imagefork>, jar: &CookieJar<'_>, id: i64) -> Result<Redirect, crate::Error> {
-    let token = CreatorToken::relogin(&mut db, id).await?;
-    token.set_in_cookie_jar(jar);
+    if let Some(token) = CreatorToken::relogin(&mut db, id).await? {
+        token.set_in_cookie_jar(jar);
+    }
     Ok(Redirect::to("/"))
 }

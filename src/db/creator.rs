@@ -1,76 +1,8 @@
 use super::Imagefork;
-use base64::Engine;
-use chrono::{DateTime, NaiveDateTime, Utc};
-use rand::RngCore;
+use chrono::NaiveDateTime;
 use rocket_db_pools::{sqlx, Connection};
 use serde::{Deserialize, Serialize};
 use sqlx::Result;
-
-pub struct CreatorToken {
-    pub id: i64,
-    pub token: String,
-    minting_time: NaiveDateTime,
-    pub moderator: bool,
-    pub lockout: bool,
-}
-
-fn generate_token() -> String {
-    let mut token = [0; 32];
-    rand::thread_rng().try_fill_bytes(&mut token).unwrap();
-    base64::engine::general_purpose::URL_SAFE.encode(token)
-}
-
-impl CreatorToken {
-    pub fn minting_time(&self) -> DateTime<Utc> {
-        DateTime::from_utc(self.minting_time, Utc)
-    }
-
-    pub async fn get_by_token(db: &mut Connection<Imagefork>, token: &str) -> Result<Option<Self>> {
-        let token = sqlx::query_as!(
-            Self,
-            r#"SELECT id, token AS "token!", minting_time AS "minting_time!", moderator, lockout
-            FROM Creators WHERE token = $1 LIMIT 1"#,
-            token
-        )
-        .fetch_optional(&mut **db)
-        .await?;
-
-        Ok(token)
-    }
-
-    pub async fn relogin(db: &mut Connection<Imagefork>, id: i64) -> Result<Self> {
-        let token = generate_token();
-
-        Ok(sqlx::query_as!(
-            Self,
-            r#"UPDATE Creators
-            SET token = $1, minting_time = (now() at time zone 'utc')
-            WHERE id = $2
-            RETURNING id, token AS "token!", minting_time AS "minting_time!", moderator, lockout"#,
-            token,
-            id
-        )
-        .fetch_optional(&mut **db)
-        .await?
-        .expect("failed to insert auth token"))
-    }
-
-    pub async fn login(db: &mut Connection<Imagefork>, email: &str) -> Result<Self> {
-        let token = generate_token();
-
-        Ok(sqlx::query_as!(
-            Self,
-            r#"INSERT INTO Creators (email, token, minting_time) VALUES ($1, $2, (now() at time zone 'utc'))
-            ON CONFLICT (email)
-            DO UPDATE SET token = $2, minting_time = (now() at time zone 'utc')
-            RETURNING id, token AS "token!", minting_time AS "minting_time!", moderator, lockout"#,
-            email,
-            token,
-        )
-        .fetch_one(&mut **db)
-        .await?)
-    }
-}
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Creator {
@@ -79,7 +11,7 @@ pub struct Creator {
     creation_time: NaiveDateTime,
     lockout: bool,
     moderator: bool,
-    poster_limit: i32,
+    pub poster_limit: i32,
 }
 
 impl Creator {
@@ -112,5 +44,38 @@ impl Creator {
         .fetch_optional(&mut **db)
         .await?
         .map(|c| c.can_add))
+    }
+}
+
+#[cfg(test)]
+pub mod test {
+    use super::{
+        super::{creator_token::test::*, Imagefork},
+        Creator,
+    };
+    use crate::db::CreatorToken;
+    use crate::test::TestRocket;
+    use rocket::serde::json::Json;
+    use rocket_db_pools::Connection;
+
+    #[get("/test/get-creator?<id>")]
+    pub async fn get_creator(mut db: Connection<Imagefork>, id: i64) -> Option<Json<Creator>> {
+        Creator::get(&mut db, id).await.unwrap().map(Into::into)
+    }
+
+    #[test]
+    fn new_user_has_defaults() {
+        let client = TestRocket::new(routes![delete_creator, login, get_creator]).client();
+        client.get(uri!(delete_creator(email = "c1")));
+        let token: CreatorToken = client.get_json(uri!(login(email = "c1")));
+
+        let creator: Option<Creator> = client.get_maybe_json(uri!(get_creator(id = token.id)));
+
+        assert!(creator.is_some());
+        let creator = creator.unwrap();
+        assert_eq!(creator.moderator, false);
+        assert_eq!(creator.lockout, false);
+        assert_eq!(creator.email, "c1");
+        assert!(creator.poster_limit < 20);
     }
 }

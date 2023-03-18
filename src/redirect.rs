@@ -38,7 +38,7 @@ async fn handler(
         Some(token) => Cache::get_or_create(
             &mut cache,
             token,
-            config.token_keepalive_minutes,
+            config.token_keepalive_minutes * 60,
             get_url_of_approx(&mut db, width, aspect),
         )
         .await
