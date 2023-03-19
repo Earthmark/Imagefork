@@ -72,8 +72,6 @@ impl Poster {
 
     pub async fn get_url_of_approx(
         db: &mut Connection<Imagefork>,
-        _width: i32,
-        _aspect: f32,
     ) -> Result<Option<String>> {
         struct FoundPoster {
             url: String,
@@ -169,17 +167,15 @@ mod test {
             add_poster
         ])
         .client();
-        let token = client.creator("p1");
+        let token = client.creator("p2");
 
         let creator: Creator = client.get_json(uri!(get_creator(id = token.id())));
 
-        for index in 0..creator.poster_limit {
+        for index in 0..creator.poster_limit + 3 {
             client.get(uri!(add_poster(creator_id = token.id(), url = format!("poster {}", index))));
         }
 
-        
-
         let posters: Vec<Poster> = client.get_json(uri!(get_all_for(creator_id = token.id())));
-        assert!(posters.len() == 0);
+        assert!(posters.len() == creator.poster_limit as usize);
     }
 }

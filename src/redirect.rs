@@ -7,14 +7,14 @@ use crate::{
 };
 
 pub fn routes() -> Vec<Route> {
-    routes![handler, ambigous_handler]
+    routes![handler]
 }
 
 static SAFE_IMAGE: &str = "canned.webp";
 static ERROR_IMAGE: &str = "error.webp";
 
-async fn get_url_of_approx(db: &mut Connection<Imagefork>, width: i32, aspect: f32) -> String {
-    match Poster::get_url_of_approx(db, width, aspect).await {
+async fn get_url_of_approx(db: &mut Connection<Imagefork>) -> String {
+    match Poster::get_url_of_approx(db).await {
         Ok(Some(url)) => url,
         Ok(None) => SAFE_IMAGE.to_string(),
         Err(e) => {
@@ -24,22 +24,20 @@ async fn get_url_of_approx(db: &mut Connection<Imagefork>, width: i32, aspect: f
     }
 }
 
-#[get("/?<width>&<aspect>&<token>")]
+#[get("/<token>")]
 async fn handler(
     mut db: Connection<Imagefork>,
     mut cache: Connection<Cache>,
     config: &State<TokenCacheConfig>,
-    width: i32,
-    aspect: f32,
-    token: Option<i64>,
+    token: Option<&str>,
 ) -> Redirect {
     let url = match token {
-        None | Some(0) => get_url_of_approx(&mut db, width, aspect).await,
+        None => get_url_of_approx(&mut db).await,
         Some(token) => Cache::get_or_create(
             &mut cache,
             token,
             config.token_keepalive_minutes * 60,
-            get_url_of_approx(&mut db, width, aspect),
+            get_url_of_approx(&mut db),
         )
         .await
         .unwrap_or_else(|e| {
@@ -48,9 +46,4 @@ async fn handler(
         }),
     };
     Redirect::to(url)
-}
-
-#[get("/")]
-pub async fn ambigous_handler() -> Redirect {
-    Redirect::to(SAFE_IMAGE)
 }
