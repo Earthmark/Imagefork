@@ -1,5 +1,5 @@
 use super::Imagefork;
-use crate::image_meta::Metadata;
+use crate::image_meta::ImageMetadata;
 use chrono::NaiveDateTime;
 use rocket_db_pools::{sqlx, Connection};
 use serde::{Deserialize, Serialize};
@@ -51,7 +51,7 @@ impl Poster {
         db: &mut Connection<Imagefork>,
         creator_id: i64,
         url: &str,
-        metadata: &Metadata,
+        metadata: &ImageMetadata,
     ) -> Result<Option<Self>> {
         sqlx::query_as!(
             Self,
@@ -70,9 +70,7 @@ impl Poster {
         .await
     }
 
-    pub async fn get_url_of_approx(
-        db: &mut Connection<Imagefork>,
-    ) -> Result<Option<String>> {
+    pub async fn get_url_of_approx(db: &mut Connection<Imagefork>) -> Result<Option<String>> {
         struct FoundPoster {
             url: String,
         }
@@ -91,16 +89,16 @@ impl Poster {
 #[cfg(test)]
 mod test {
     use super::{
-        super::{creator::test::*, creator_token::test::*, Imagefork},
+        super::{creator::test::*, Imagefork},
         Poster,
     };
     use crate::test::TestRocket;
-    use crate::{db::Creator, image_meta::Metadata};
+    use crate::{db::Creator, image_meta::ImageMetadata};
     use rocket::serde::json::Json;
     use rocket_db_pools::Connection;
 
     #[get("/test/get-poster?<poster_id>&<creator_id>")]
-    pub async fn get_poster(
+    async fn get_poster(
         mut db: Connection<Imagefork>,
         poster_id: i64,
         creator_id: i64,
@@ -112,7 +110,7 @@ mod test {
     }
 
     #[get("/test/get-all?<creator_id>")]
-    pub async fn get_all_for(mut db: Connection<Imagefork>, creator_id: i64) -> Json<Vec<Poster>> {
+    async fn get_all_for(mut db: Connection<Imagefork>, creator_id: i64) -> Json<Vec<Poster>> {
         Poster::get_all_by_creator(&mut db, creator_id)
             .await
             .unwrap()
@@ -120,7 +118,7 @@ mod test {
     }
 
     #[get("/test/add_poster?<creator_id>&<url>")]
-    pub async fn add_poster(
+    async fn add_poster(
         mut db: Connection<Imagefork>,
         creator_id: i64,
         url: &str,
@@ -129,7 +127,7 @@ mod test {
             &mut db,
             creator_id,
             url,
-            &Metadata {
+            &ImageMetadata {
                 height: 100,
                 width: 100,
                 hash: "AAAA".to_string(),
@@ -142,14 +140,7 @@ mod test {
 
     #[test]
     fn new_user_has_no_posters() {
-        let client = TestRocket::new(routes![
-            delete_creator,
-            login,
-            get_poster,
-            get_all_for,
-            add_poster
-        ])
-        .client();
+        let client = TestRocket::new(routes![get_poster, get_all_for, add_poster]).client();
         let token = client.creator("p1");
 
         let posters: Vec<Poster> = client.get_json(uri!(get_all_for(creator_id = token.id())));
@@ -158,21 +149,16 @@ mod test {
 
     #[test]
     fn new_user_has_poster_limit() {
-        let client = TestRocket::new(routes![
-            delete_creator,
-            login,
-            get_creator,
-            get_poster,
-            get_all_for,
-            add_poster
-        ])
-        .client();
+        let client = TestRocket::new(routes![get_poster, get_all_for, add_poster]).client();
         let token = client.creator("p2");
 
         let creator: Creator = client.get_json(uri!(get_creator(id = token.id())));
 
         for index in 0..creator.poster_limit + 3 {
-            client.get(uri!(add_poster(creator_id = token.id(), url = format!("poster {}", index))));
+            client.get(uri!(add_poster(
+                creator_id = token.id(),
+                url = format!("poster {}", index)
+            )));
         }
 
         let posters: Vec<Poster> = client.get_json(uri!(get_all_for(creator_id = token.id())));

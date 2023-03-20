@@ -6,11 +6,11 @@ use sqlx::Result;
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Creator {
-    id: i64,
-    email: String,
-    creation_time: NaiveDateTime,
-    lockout: bool,
-    moderator: bool,
+    pub id: i64,
+    pub email: String,
+    pub creation_time: NaiveDateTime,
+    pub lockout: bool,
+    pub moderator: bool,
     pub poster_limit: i32,
 }
 
@@ -55,8 +55,12 @@ pub mod test {
     };
     use crate::db::CreatorToken;
     use crate::test::TestRocket;
-    use rocket::serde::json::Json;
+    use rocket::{serde::json::Json, Route};
     use rocket_db_pools::Connection;
+
+    pub fn routes() -> Vec<Route> {
+        routes![get_creator]
+    }
 
     #[get("/test/get-creator?<id>")]
     pub async fn get_creator(mut db: Connection<Imagefork>, id: i64) -> Option<Json<Creator>> {
@@ -65,7 +69,7 @@ pub mod test {
 
     #[test]
     fn new_user_has_defaults() {
-        let client = TestRocket::new(routes![delete_creator, login, get_creator]).client();
+        let client = TestRocket::default().client();
         client.get(uri!(delete_creator(email = "c1")));
         let token: CreatorToken = client.get_json(uri!(login(email = "c1")));
 

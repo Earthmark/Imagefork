@@ -3,12 +3,14 @@ use rocket_dyn_templates::Template;
 
 pub mod auth;
 pub mod creators;
+pub mod posters;
 pub mod token;
 
 pub fn routes() -> Vec<Route> {
     let mut routes = routes![index];
     routes.append(&mut auth::routes());
     routes.append(&mut creators::routes());
+    routes.append(&mut posters::routes());
     routes
 }
 

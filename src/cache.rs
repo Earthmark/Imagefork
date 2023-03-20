@@ -147,12 +147,12 @@ mod test {
     #[test]
     fn ensure_cache_is_hashed() {
         let client = TestRocket::new(routes![set, force_delete, get_raw]).client();
-        client.get(uri!(force_delete(token = "C")));
+        client.get(uri!(force_delete(token = "D")));
         assert_eq!(
-            client.get_string(uri!(set(token = "C", value = "tacos"))),
+            client.get_string(uri!(set(token = "D", value = "tacos"))),
             "tacos"
         );
-        assert_eq!(client.get_string(uri!(get_raw(token = "C"))), "");
-        client.get(uri!(force_delete(token = "C")));
+        assert_eq!(client.get_string(uri!(get_raw(token = "D"))), "");
+        client.get(uri!(force_delete(token = "D")));
     }
 }

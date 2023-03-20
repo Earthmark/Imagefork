@@ -3,21 +3,12 @@ use sha2::{Digest, Sha256};
 use std::{fmt::Write, time::Duration};
 use thiserror::Error;
 
-use reqwest::{redirect::Policy, Client};
-
-pub struct ImageMetadata(Client);
-
-impl Default for ImageMetadata {
-    fn default() -> Self {
-        Self(
-            Client::builder()
-                .redirect(Policy::limited(0))
-                .connect_timeout(Duration::from_secs(10))
-                .build()
-                .unwrap(),
-        )
-    }
-}
+use reqwest::{
+    header,
+    header::{HeaderMap, HeaderValue},
+    redirect::Policy,
+    Client,
+};
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -27,10 +18,31 @@ pub enum Error {
     Image(#[from] image::ImageError),
 }
 
-pub struct Metadata {
+pub struct ImageMetadata {
     pub height: u32,
     pub width: u32,
     pub hash: String,
+}
+
+pub struct WebImageMetadataAggregator(Client);
+
+impl Default for WebImageMetadataAggregator {
+    fn default() -> Self {
+        let mut headers = HeaderMap::new();
+        headers.append(header::ACCEPT, HeaderValue::from_static("*/*"));
+        headers.append(
+            header::USER_AGENT,
+            HeaderValue::from_static("Earthmark-Imagefork"),
+        );
+        Self(
+            Client::builder()
+                .redirect(Policy::limited(0))
+                .connect_timeout(Duration::from_secs(10))
+                .default_headers(headers)
+                .build()
+                .unwrap(),
+        )
+    }
 }
 
 fn get_size(b: &[u8]) -> Result<(u32, u32), Error> {
@@ -49,15 +61,15 @@ fn get_hash(b: &[u8]) -> String {
     s
 }
 
-impl ImageMetadata {
-    pub async fn get_metadata(&self, url: &str) -> Result<Metadata, Error> {
-        let request = self.0.get(url).header("Accept", "*/*").send().await?;
+impl WebImageMetadataAggregator {
+    pub async fn get_metadata(&self, url: &str) -> Result<ImageMetadata, Error> {
+        let request = self.0.get(url).send().await?;
         let body = request.bytes().await?.to_vec();
 
         let (height, width) = get_size(&body)?;
         let hash = get_hash(&body);
 
-        Ok(Metadata {
+        Ok(ImageMetadata {
             height,
             width,
             hash,

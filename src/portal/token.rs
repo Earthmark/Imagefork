@@ -71,7 +71,10 @@ impl<'r> FromRequest<'r> for &'r CreatorToken {
                             CreatorToken::remove_from_cookie_jar(cookies);
                             None
                         } else if token.minting_time() + config.refresh_limit < now {
-                            CreatorToken::relogin(&mut db, token.id).await.ok().flatten()
+                            CreatorToken::relogin(&mut db, token.id)
+                                .await
+                                .ok()
+                                .flatten()
                         } else {
                             Some(token)
                         }
@@ -100,5 +103,89 @@ impl<'r> FromRequest<'r> for ModeratorToken<'r> {
         } else {
             Outcome::Forward(())
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::{CreatorToken, ModeratorToken};
+    use crate::test::*;
+    use rocket::http::StatusClass;
+
+    #[get("/test/creator-only")]
+    async fn creator_only(_auth: &CreatorToken) {}
+
+    #[get("/test/admin-only")]
+    async fn admin_only(_auth: ModeratorToken<'_>) {}
+
+    #[test]
+    fn creator_only_request_rejected() {
+        let client = TestRocket::new(routes![creator_only]).client();
+        assert_eq!(
+            client.get(uri!(creator_only)).class(),
+            StatusClass::ClientError
+        );
+    }
+
+    #[test]
+    fn creator_only_request_accepted() {
+        let client = TestRocket::new(routes![creator_only]).client();
+        let user = client.creator("pt1");
+        user.login();
+        assert_eq!(client.get(uri!(creator_only)).class(), StatusClass::Success);
+    }
+
+    #[test]
+    fn creator_only_request_user_delete_rejected() {
+        let client = TestRocket::new(routes![creator_only]).client();
+        let user = client.creator("pt2");
+        user.login();
+        user.delete();
+        assert_eq!(
+            client.get(uri!(creator_only)).class(),
+            StatusClass::ClientError
+        );
+    }
+
+    #[test]
+    fn admin_only_request_rejected() {
+        let client = TestRocket::new(routes![admin_only]).client();
+        assert_eq!(
+            client.get(uri!(admin_only)).class(),
+            StatusClass::ClientError
+        );
+    }
+
+    #[test]
+    fn admin_only_request_by_creator_rejected() {
+        let client = TestRocket::new(routes![admin_only]).client();
+        let user = client.creator("pt3");
+        user.login();
+        assert_eq!(
+            client.get(uri!(admin_only)).class(),
+            StatusClass::ClientError
+        );
+    }
+
+    #[test]
+    fn admin_only_request_accepted() {
+        let client = TestRocket::new(routes![admin_only]).client();
+        let user = client.creator("pt4");
+        user.login();
+        user.promote();
+        assert_eq!(client.get(uri!(admin_only)).class(), StatusClass::Success);
+    }
+
+    #[test]
+    fn admin_only_request_user_deleted_rejected() {
+        let client = TestRocket::new(routes![admin_only]).client();
+        let user = client.creator("pt5");
+        user.login();
+        user.promote();
+        user.delete();
+        assert_eq!(
+            client.get(uri!(admin_only)).class(),
+            StatusClass::ClientError
+        );
     }
 }

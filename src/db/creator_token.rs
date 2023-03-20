@@ -77,9 +77,14 @@ pub mod test {
     use std::time::Duration;
 
     use super::{super::Imagefork, CreatorToken};
+    use crate::portal::auth::test::*;
     use crate::test::{TestClient, TestRocket};
-    use rocket::serde::json::Json;
+    use rocket::{serde::json::Json, Route};
     use rocket_db_pools::{sqlx, Connection};
+
+    pub fn routes() -> Vec<Route> {
+        routes![delete_creator, login, promote]
+    }
 
     #[get("/test/delete_creator?<email>")]
     pub async fn delete_creator(mut db: Connection<Imagefork>, email: String) {
@@ -87,6 +92,19 @@ pub mod test {
             "DELETE FROM Creators 
             WHERE email = $1",
             email
+        )
+        .execute(&mut *db)
+        .await
+        .unwrap();
+    }
+
+    #[get("/test/promote?<id>")]
+    pub async fn promote(mut db: Connection<Imagefork>, id: i64) {
+        sqlx::query!(
+            "UPDATE Creators 
+            SET moderator = true
+            WHERE id = $1",
+            id
         )
         .execute(&mut *db)
         .await
@@ -118,7 +136,7 @@ pub mod test {
     }
 
     impl TestClient {
-        pub fn creator<'a>(&'a self, email: &'static str) -> TestUser {
+        pub fn creator(&self, email: &'static str) -> TestUser {
             self.get(uri!(delete_creator(email = email)));
             let bearer = self.get_json(uri!(login(email = email)));
             TestUser {
@@ -149,18 +167,29 @@ pub mod test {
         pub fn token(&self) -> &str {
             &self.bearer.token
         }
+
+        pub fn login(&self) {
+            self.client.get(uri!(force_login(id = self.id())));
+        }
+
+        pub fn promote(&self) {
+            self.client.get(uri!(promote(id = self.id())));
+        }
+
+        pub fn delete(&self) {
+            self.client.delete_creator(self.email());
+        }
     }
 
     impl Drop for TestUser<'_> {
         fn drop(&mut self) {
-            self.client.delete_creator(self.email());
+            self.delete();
         }
     }
 
     #[test]
     fn login_creates_user() {
-        let client =
-            TestRocket::new(routes![delete_creator, login, relogin, get_by_token]).client();
+        let client = TestRocket::new(routes![relogin, get_by_token]).client();
         let token = client.creator("ct1");
         assert!(token.token().len() > 10);
 
@@ -168,7 +197,7 @@ pub mod test {
             client.get_maybe_json(uri!(get_by_token(token = &token.token())));
         assert!(gotten_token.is_some());
 
-        client.get(uri!(delete_creator(email = "ct1")));
+        token.delete();
         let gotten_token: Option<CreatorToken> =
             client.get_maybe_json(uri!(get_by_token(token = &token.token())));
 
@@ -177,8 +206,7 @@ pub mod test {
 
     #[test]
     fn relog_resets_minting_time() {
-        let client =
-            TestRocket::new(routes![delete_creator, login, relogin, get_by_token]).client();
+        let client = TestRocket::new(routes![relogin, get_by_token]).client();
         let token = client.creator("ct2");
         let old_time = token.bearer.minting_time;
 
@@ -191,8 +219,7 @@ pub mod test {
 
     #[test]
     fn relog_unknown_token() {
-        let client =
-            TestRocket::new(routes![delete_creator, login, relogin, get_by_token]).client();
+        let client = TestRocket::new(routes![relogin, get_by_token]).client();
 
         let gotten_token: Option<CreatorToken> =
             client.get_maybe_json(uri!(get_by_token(token = "A very unknown token")));

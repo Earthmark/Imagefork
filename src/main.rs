@@ -60,7 +60,7 @@ pub fn rocket() -> Rocket<Build> {
         .attach(cache::Cache::init())
         .attach(db::Imagefork::init())
         .attach(db::Imagefork::init_migrations())
-        .manage(image_meta::ImageMetadata::default())
+        .manage(image_meta::WebImageMetadataAggregator::default())
         .manage(portal::auth::AuthClient::default())
         .attach(OAuth2::<portal::auth::github::GitHub>::fairing("github"))
         .mount("/", portal::auth::github::routes())
@@ -76,22 +76,35 @@ mod test {
     use std::fmt::Display;
 
     use super::rocket;
-    use rocket::{http::uri::Origin, local::blocking::Client, Build, Rocket, Route};
+    use rocket::{
+        http::{uri::Origin, Status},
+        local::blocking::Client,
+        Build, Rocket, Route,
+    };
+
+    pub use crate::db::creator::test::*;
+    pub use crate::db::creator_token::test::*;
+    pub use crate::portal::auth::test::*;
 
     pub struct TestRocket(Rocket<Build>);
 
     impl Default for TestRocket {
         fn default() -> Self {
-            Self(rocket())
+            Self(
+                rocket()
+                    .mount("/", crate::portal::auth::test::routes())
+                    .mount("/", crate::db::creator_token::test::routes())
+                    .mount("/", crate::db::creator::test::routes()),
+            )
         }
     }
 
     impl TestRocket {
-        pub fn new<R: Into<Vec<Route>>>(routes: R) -> Self {
-            Self::default().mount(routes)
+        pub fn new<R: Into<Vec<Route>>>(r: R) -> Self {
+            Self::default().mount(r)
         }
-        pub fn mount<R: Into<Vec<Route>>>(self, routes: R) -> Self {
-            Self(self.0.mount("/", routes))
+        pub fn mount<R: Into<Vec<Route>>>(self, r: R) -> Self {
+            Self(self.0.mount("/", r))
         }
         pub fn client(self) -> TestClient {
             TestClient(Client::tracked(self.0).unwrap())
@@ -101,11 +114,11 @@ mod test {
     pub struct TestClient(Client);
 
     impl TestClient {
+        pub fn get<'c, 'u, U: TryInto<Origin<'u>> + Display>(&'c self, uri: U) -> Status {
+            self.0.get(uri).dispatch().status()
+        }
         pub fn get_string<'c, 'u, U: TryInto<Origin<'u>> + Display>(&'c self, uri: U) -> String {
             self.0.get(uri).dispatch().into_string().unwrap()
-        }
-        pub fn get<'c, 'u, U: TryInto<Origin<'u>> + Display>(&'c self, uri: U) {
-            self.0.get(uri).dispatch();
         }
         pub fn get_json<
             'c,
