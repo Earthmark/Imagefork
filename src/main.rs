@@ -4,12 +4,12 @@ extern crate rocket;
 mod cache;
 mod config;
 mod db;
+mod image;
 mod image_meta;
 mod portal;
 mod redirect;
 
 use config::bind;
-
 use rocket::{
     figment::{
         providers::{Format, Toml},

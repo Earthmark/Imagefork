@@ -24,48 +24,18 @@
           "type_info": "Text"
         },
         {
-          "name": "height",
-          "ordinal": 4,
-          "type_info": "Int4"
-        },
-        {
-          "name": "width",
-          "ordinal": 5,
-          "type_info": "Int4"
-        },
-        {
-          "name": "hash",
-          "ordinal": 6,
-          "type_info": "Text"
-        },
-        {
-          "name": "dead_url",
-          "ordinal": 7,
-          "type_info": "Bool"
-        },
-        {
-          "name": "life_last_checked",
-          "ordinal": 8,
-          "type_info": "Timestamp"
-        },
-        {
-          "name": "start_time",
-          "ordinal": 9,
-          "type_info": "Timestamp"
-        },
-        {
-          "name": "end_time",
-          "ordinal": 10,
-          "type_info": "Timestamp"
-        },
-        {
           "name": "stopped",
-          "ordinal": 11,
+          "ordinal": 4,
           "type_info": "Bool"
         },
         {
           "name": "lockout",
-          "ordinal": 12,
+          "ordinal": 5,
+          "type_info": "Bool"
+        },
+        {
+          "name": "serveable",
+          "ordinal": 6,
           "type_info": "Bool"
         }
       ],
@@ -75,12 +45,6 @@
         false,
         false,
         false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
         false,
         false
       ],
@@ -93,7 +57,7 @@
     },
     "query": "SELECT * FROM Posters WHERE id = $1 AND creator = $2 LIMIT 1"
   },
-  "252ba10689d4d24e40bdd10663ab366ee59a29a1397e6fe13a6f482b501bb790": {
+  "050d723ff146e795dedc263017ad4c8bdf93e7ea1a084eaaab19012519a70855": {
     "describe": {
       "columns": [
         {
@@ -136,7 +100,7 @@
         ]
       }
     },
-    "query": "INSERT INTO Creators (email, token, minting_time) VALUES ($1, $2, (now() at time zone 'utc'))\n            ON CONFLICT (email)\n            DO UPDATE SET token = $2, minting_time = (now() at time zone 'utc')\n            RETURNING id, token AS \"token!\", minting_time AS \"minting_time!\", moderator, lockout"
+    "query": "INSERT INTO Creators (email, token, minting_time) VALUES ($1, $2, (now() at time zone 'utc'))\n          ON CONFLICT (email)\n          DO UPDATE SET token = $2, minting_time = (now() at time zone 'utc')\n          RETURNING id, token AS \"token!\", minting_time AS \"minting_time!\", moderator, lockout"
   },
   "308eb5fa8cefea532774c56787f2e06dd99892e2d32a223c0bc1c6a0875842cf": {
     "describe": {
@@ -232,48 +196,18 @@
           "type_info": "Text"
         },
         {
-          "name": "height",
-          "ordinal": 4,
-          "type_info": "Int4"
-        },
-        {
-          "name": "width",
-          "ordinal": 5,
-          "type_info": "Int4"
-        },
-        {
-          "name": "hash",
-          "ordinal": 6,
-          "type_info": "Text"
-        },
-        {
-          "name": "dead_url",
-          "ordinal": 7,
-          "type_info": "Bool"
-        },
-        {
-          "name": "life_last_checked",
-          "ordinal": 8,
-          "type_info": "Timestamp"
-        },
-        {
-          "name": "start_time",
-          "ordinal": 9,
-          "type_info": "Timestamp"
-        },
-        {
-          "name": "end_time",
-          "ordinal": 10,
-          "type_info": "Timestamp"
-        },
-        {
           "name": "stopped",
-          "ordinal": 11,
+          "ordinal": 4,
           "type_info": "Bool"
         },
         {
           "name": "lockout",
-          "ordinal": 12,
+          "ordinal": 5,
+          "type_info": "Bool"
+        },
+        {
+          "name": "serveable",
+          "ordinal": 6,
           "type_info": "Bool"
         }
       ],
@@ -283,12 +217,6 @@
         false,
         false,
         false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
         false,
         false
       ],
@@ -300,7 +228,27 @@
     },
     "query": "SELECT * FROM Posters WHERE creator = $1"
   },
-  "7ffe6ccb4241f2c5808b8b7b441d0016307767c1a2b5c44fbf47ec7ae49b2d2b": {
+  "a5dcb17174f912b4903a9b978b21ffc7c4bec68c87aa8e3ca321206b5a12f1a3": {
+    "describe": {
+      "columns": [
+        {
+          "name": "url",
+          "ordinal": 0,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      }
+    },
+    "query": "SELECT url FROM Posters WHERE id = $1"
+  },
+  "afb0d0f89225f4fde841da9adc142a753b35d98205e4f2660201c0f5efbebb7d": {
     "describe": {
       "columns": [
         {
@@ -342,121 +290,7 @@
         ]
       }
     },
-    "query": "SELECT id, token AS \"token!\", minting_time AS \"minting_time!\", moderator, lockout\n            FROM Creators WHERE token = $1 LIMIT 1"
-  },
-  "d0149e669650218decfc2f2a38979e8abc190a15c69f606df87524f46395e605": {
-    "describe": {
-      "columns": [
-        {
-          "name": "id",
-          "ordinal": 0,
-          "type_info": "Int8"
-        },
-        {
-          "name": "creator",
-          "ordinal": 1,
-          "type_info": "Int8"
-        },
-        {
-          "name": "creation_time",
-          "ordinal": 2,
-          "type_info": "Timestamp"
-        },
-        {
-          "name": "url",
-          "ordinal": 3,
-          "type_info": "Text"
-        },
-        {
-          "name": "height",
-          "ordinal": 4,
-          "type_info": "Int4"
-        },
-        {
-          "name": "width",
-          "ordinal": 5,
-          "type_info": "Int4"
-        },
-        {
-          "name": "hash",
-          "ordinal": 6,
-          "type_info": "Text"
-        },
-        {
-          "name": "dead_url",
-          "ordinal": 7,
-          "type_info": "Bool"
-        },
-        {
-          "name": "life_last_checked",
-          "ordinal": 8,
-          "type_info": "Timestamp"
-        },
-        {
-          "name": "start_time",
-          "ordinal": 9,
-          "type_info": "Timestamp"
-        },
-        {
-          "name": "end_time",
-          "ordinal": 10,
-          "type_info": "Timestamp"
-        },
-        {
-          "name": "stopped",
-          "ordinal": 11,
-          "type_info": "Bool"
-        },
-        {
-          "name": "lockout",
-          "ordinal": 12,
-          "type_info": "Bool"
-        }
-      ],
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        false,
-        false
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Text",
-          "Int4",
-          "Int4",
-          "Text"
-        ]
-      }
-    },
-    "query": "INSERT INTO Posters (Creator, Url, Height, Width, Hash)\n            SELECT $1, $2, $3, $4, $5\n            WHERE (SELECT COUNT(*) FROM Posters WHERE creator = $1) < (SELECT poster_limit FROM Creators WHERE id = $1 LIMIT 1)\n            RETURNING *;\n            "
-  },
-  "ddc28ad4f873b02682864c6d1c3157d161353d337eb139d55228fa105732d675": {
-    "describe": {
-      "columns": [
-        {
-          "name": "url",
-          "ordinal": 0,
-          "type_info": "Text"
-        }
-      ],
-      "nullable": [
-        false
-      ],
-      "parameters": {
-        "Left": []
-      }
-    },
-    "query": "SELECT url FROM Posters\n            WHERE id IN (SELECT id FROM Posters ORDER BY RANDOM() LIMIT 1)\n            LIMIT 1"
+    "query": "SELECT id, token AS \"token!\", minting_time AS \"minting_time!\", moderator, lockout\n          FROM Creators WHERE token = $1 LIMIT 1"
   },
   "dfa723ea6a6066caffa78b6664c35a4eadfd878883fa5b3598b56fd4c7d80d00": {
     "describe": {
@@ -502,5 +336,80 @@
       }
     },
     "query": "UPDATE Creators\n            SET token = $1, minting_time = (now() at time zone 'utc')\n            WHERE id = $2\n            RETURNING id, token AS \"token!\", minting_time AS \"minting_time!\", moderator, lockout"
+  },
+  "f6f006aaf3bca7585cb6e646b566bf394eafa6c4af7fdc2e0ab7bd68ea392e41": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "creator",
+          "ordinal": 1,
+          "type_info": "Int8"
+        },
+        {
+          "name": "creation_time",
+          "ordinal": 2,
+          "type_info": "Timestamp"
+        },
+        {
+          "name": "url",
+          "ordinal": 3,
+          "type_info": "Text"
+        },
+        {
+          "name": "stopped",
+          "ordinal": 4,
+          "type_info": "Bool"
+        },
+        {
+          "name": "lockout",
+          "ordinal": 5,
+          "type_info": "Bool"
+        },
+        {
+          "name": "serveable",
+          "ordinal": 6,
+          "type_info": "Bool"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Text"
+        ]
+      }
+    },
+    "query": "INSERT INTO Posters (Creator, Url)\n            SELECT $1, $2\n            WHERE (SELECT COUNT(*) FROM Posters WHERE creator = $1) < (SELECT poster_limit FROM Creators WHERE id = $1 LIMIT 1)\n            RETURNING *;\n            "
+  },
+  "fba5d616fa44b1e53da2fd8e694707f51740ac54136fccfc874aa48a21b2fd7d": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Left": []
+      }
+    },
+    "query": "SELECT id FROM Posters WHERE serveable ORDER BY RANDOM() LIMIT 1"
   }
 }

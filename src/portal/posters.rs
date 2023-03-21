@@ -2,12 +2,10 @@ use crate::db::Creator;
 use crate::db::CreatorToken;
 use crate::db::Imagefork;
 use crate::db::Poster;
-use crate::image_meta::WebImageMetadataAggregator;
 use rocket::http::Status;
 use rocket::response::status::Unauthorized;
 use rocket::serde::json::Json;
 use rocket::Either;
-use rocket::State;
 use rocket_db_pools::Connection;
 use serde::Deserialize;
 
@@ -59,7 +57,6 @@ struct PosterCreate {
 #[post("/poster", format = "json", data = "<poster>")]
 async fn post_poster(
     token: &CreatorToken,
-    c: &State<WebImageMetadataAggregator>,
     mut db: Connection<Imagefork>,
     poster: Json<PosterCreate>,
 ) -> Result<Either<Json<Poster>, (Status, ())>> {
@@ -71,8 +68,7 @@ async fn post_poster(
         return Ok(Either::Right((Status::Forbidden, ())));
     }
 
-    let metadata = c.get_metadata(&poster.url).await.unwrap();
-    let poster = Poster::post(&mut db, token.id, &poster.url, &metadata)
+    let poster = Poster::post(&mut db, token.id, &poster.url)
         .await?
         .ok_or(crate::Error::SystemError(
             "Failed to create poster.".to_string(),

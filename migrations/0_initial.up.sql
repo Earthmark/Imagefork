@@ -8,19 +8,20 @@ CREATE TABLE Creators (
   moderator BOOLEAN NOT NULL DEFAULT FALSE,
   poster_limit INTEGER NOT NULL DEFAULT 3
 );
-
 CREATE TABLE Posters (
   id BIGSERIAL PRIMARY KEY,
   creator BIGSERIAL NOT NULL REFERENCES Creators (id) ON DELETE CASCADE,
   creation_time TIMESTAMP NOT NULL DEFAULT (now() at time zone 'utc'),
   url TEXT NOT NULL,
-  height INTEGER NOT NULL DEFAULT 0,
-  width INTEGER NOT NULL DEFAULT 0,
-  hash TEXT NOT NULL DEFAULT '',
-  dead_url BOOLEAN NOT NULL DEFAULT FALSE,
-  life_last_checked TIMESTAMP NOT NULL DEFAULT (now() at time zone 'utc'),
-  start_time TIMESTAMP NOT NULL DEFAULT (now() at time zone 'utc'),
-  end_time TIMESTAMP,
   stopped BOOLEAN NOT NULL DEFAULT FALSE,
-  lockout BOOLEAN NOT NULL DEFAULT FALSE
+  lockout BOOLEAN NOT NULL DEFAULT FALSE,
+  serveable BOOLEAN NOT NULL GENERATED ALWAYS AS (
+    NOT (
+      stopped
+      OR lockout
+    )
+  ) STORED
 );
+INSERT INTO Creators (id, email, poster_limit) VALUES (0, 'SYSTEM', 0);
+INSERT INTO Posters (id, creator, url, stopped) VALUES (0, 0, 'ERROR', TRUE);
+INSERT INTO Posters (id, creator, url, stopped) VALUES (1, 0, 'SAFE', TRUE);

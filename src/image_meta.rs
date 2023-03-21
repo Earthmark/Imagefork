@@ -62,6 +62,8 @@ fn get_hash(b: &[u8]) -> String {
 }
 
 impl WebImageMetadataAggregator {
+    // Make use of this in the future once it can be mocked, and we have a cron job to verify metadata.
+    #[allow(dead_code)]
     pub async fn get_metadata(&self, url: &str) -> Result<ImageMetadata, Error> {
         let request = self.0.get(url).send().await?;
         let body = request.bytes().await?.to_vec();

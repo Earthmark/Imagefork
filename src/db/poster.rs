@@ -1,5 +1,4 @@
 use super::Imagefork;
-use crate::image_meta::ImageMetadata;
 use chrono::NaiveDateTime;
 use rocket_db_pools::{sqlx, Connection};
 use serde::{Deserialize, Serialize};
@@ -11,15 +10,9 @@ pub struct Poster {
     creator: i64,
     creation_time: NaiveDateTime,
     url: String,
-    height: i32,
-    width: i32,
-    hash: String,
-    dead_url: bool,
-    life_last_checked: NaiveDateTime,
-    start_time: NaiveDateTime,
-    end_time: Option<NaiveDateTime>,
     stopped: bool,
     lockout: bool,
+    serveable: bool,
 }
 
 impl Poster {
@@ -51,38 +44,44 @@ impl Poster {
         db: &mut Connection<Imagefork>,
         creator_id: i64,
         url: &str,
-        metadata: &ImageMetadata,
     ) -> Result<Option<Self>> {
         sqlx::query_as!(
             Self,
-            "INSERT INTO Posters (Creator, Url, Height, Width, Hash)
-            SELECT $1, $2, $3, $4, $5
+            "INSERT INTO Posters (Creator, Url)
+            SELECT $1, $2
             WHERE (SELECT COUNT(*) FROM Posters WHERE creator = $1) < (SELECT poster_limit FROM Creators WHERE id = $1 LIMIT 1)
             RETURNING *;
             ",
             creator_id,
             url,
-            metadata.height as i32,
-            metadata.width as i32,
-            metadata.hash,
         )
         .fetch_optional(&mut **db)
         .await
     }
 
-    pub async fn get_url_of_approx(db: &mut Connection<Imagefork>) -> Result<Option<String>> {
+    pub async fn get_id_of_approx(db: &mut Connection<Imagefork>) -> Result<Option<i64>> {
         struct FoundPoster {
-            url: String,
+            id: i64,
         }
         Ok(sqlx::query_as!(
             FoundPoster,
-            "SELECT url FROM Posters
-            WHERE id IN (SELECT id FROM Posters ORDER BY RANDOM() LIMIT 1)
-            LIMIT 1"
+            "SELECT id FROM Posters WHERE serveable ORDER BY RANDOM() LIMIT 1"
         )
         .fetch_optional(&mut **db)
         .await?
-        .map(|f| f.url))
+        .map(|f| f.id))
+    }
+
+    pub async fn get_url(db: &mut Connection<Imagefork>, id: i64) -> Result<Option<String>> {
+        struct PosterUrl {
+            url: String,
+        }
+        Ok(
+            sqlx::query_as!(PosterUrl, "SELECT url FROM Posters WHERE id = $1", id)
+                .fetch_optional(&mut **db)
+                .await?
+                .map(|f| f.url),
+        )
     }
 }
 
@@ -92,8 +91,8 @@ mod test {
         super::{creator::test::*, Imagefork},
         Poster,
     };
+    use crate::db::Creator;
     use crate::test::TestRocket;
-    use crate::{db::Creator, image_meta::ImageMetadata};
     use rocket::serde::json::Json;
     use rocket_db_pools::Connection;
 
@@ -123,19 +122,10 @@ mod test {
         creator_id: i64,
         url: &str,
     ) -> Option<Json<Poster>> {
-        Poster::post(
-            &mut db,
-            creator_id,
-            url,
-            &ImageMetadata {
-                height: 100,
-                width: 100,
-                hash: "AAAA".to_string(),
-            },
-        )
-        .await
-        .unwrap()
-        .map(Into::into)
+        Poster::post(&mut db, creator_id, url)
+            .await
+            .unwrap()
+            .map(Into::into)
     }
 
     #[test]

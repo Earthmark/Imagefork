@@ -35,8 +35,8 @@ impl Cache {
         db: &mut Connection<Self>,
         token: &str,
         token_keepalive_seconds: i32,
-        init: impl Future<Output = String>,
-    ) -> Result<String, crate::Error> {
+        init: impl Future<Output = i64>,
+    ) -> Result<i64, crate::Error> {
         let hash = hash_token(token);
 
         if let Some(target) = cmd("GETEX")
@@ -49,9 +49,9 @@ impl Cache {
             Ok(target)
         } else {
             let target = init.await;
-            let try_set: Option<String> = cmd("SET")
+            let try_set: Option<i64> = cmd("SET")
                 .arg(hash.as_slice())
-                .arg(&target)
+                .arg(target)
                 .arg("NX")
                 .arg("GET")
                 .arg("EX")
@@ -69,37 +69,41 @@ mod test {
 
     use super::Cache;
     use crate::test::TestRocket;
+    use rocket::serde::json::Json;
     use rocket_db_pools::{deadpool_redis::redis::cmd, Connection};
 
-    async fn echo(value: &str) -> String {
-        value.to_string()
+    async fn echo(value: i64) -> i64 {
+        value
     }
 
     #[get("/test/set?<token>&<value>")]
-    async fn set(mut db: Connection<Cache>, token: &str, value: &str) -> String {
+    async fn set(mut db: Connection<Cache>, token: &str, value: i64) -> Json<i64> {
         Cache::get_or_create(&mut db, token, 1, echo(value))
             .await
             .unwrap()
+            .into()
     }
 
     #[get("/test/get-raw?<token>")]
-    async fn get_raw(mut db: Connection<Cache>, token: &str) -> String {
+    async fn get_raw(mut db: Connection<Cache>, token: &str) -> Json<i64> {
         cmd("GET")
             .arg(token)
-            .query_async::<_, Option<String>>(&mut *db)
+            .query_async::<_, Option<i64>>(&mut *db)
             .await
             .unwrap()
-            .unwrap_or("".to_string())
+            .unwrap_or(0)
+            .into()
     }
 
     #[get("/test/force-delete?<token>")]
-    async fn force_delete(mut db: Connection<Cache>, token: &str) -> Option<String> {
+    async fn force_delete(mut db: Connection<Cache>, token: &str) -> Option<Json<i64>> {
         let hash = super::hash_token(token);
         cmd("GETDEL")
             .arg(hash.as_slice())
-            .query_async(&mut *db)
+            .query_async::<_, Option<i64>>(&mut *db)
             .await
             .unwrap()
+            .map(Into::into)
     }
 
     #[test]
@@ -107,22 +111,10 @@ mod test {
         let client = TestRocket::new(routes![set, force_delete]).client();
         client.get(uri!(force_delete(token = "A")));
         client.get(uri!(force_delete(token = "B")));
-        assert_eq!(
-            client.get_string(uri!(set(token = "A", value = "tacos"))),
-            "tacos"
-        );
-        assert_eq!(
-            client.get_string(uri!(set(token = "A", value = "nana"))),
-            "tacos"
-        );
-        assert_eq!(
-            client.get_string(uri!(set(token = "B", value = "nana"))),
-            "nana"
-        );
-        assert_eq!(
-            client.get_string(uri!(set(token = "B", value = "tacos"))),
-            "nana"
-        );
+        assert_eq!(&client.get_string(uri!(set(token = "A", value = 1))), "1");
+        assert_eq!(&client.get_string(uri!(set(token = "A", value = 2))), "1");
+        assert_eq!(&client.get_string(uri!(set(token = "B", value = 2))), "2");
+        assert_eq!(&client.get_string(uri!(set(token = "B", value = 1))), "2");
         client.get(uri!(force_delete(token = "A")));
         client.get(uri!(force_delete(token = "B")));
     }
@@ -131,15 +123,9 @@ mod test {
     fn same_key_ages_out_returns_cached_value() {
         let client = TestRocket::new(routes![set, force_delete]).client();
         client.get(uri!(force_delete(token = "C")));
-        assert_eq!(
-            client.get_string(uri!(set(token = "C", value = "tacos"))),
-            "tacos"
-        );
+        assert_eq!(&client.get_string(uri!(set(token = "C", value = 1))), "1");
         std::thread::sleep(Duration::from_millis(1500));
-        assert_eq!(
-            client.get_string(uri!(set(token = "C", value = "nana"))),
-            "nana"
-        );
+        assert_eq!(&client.get_string(uri!(set(token = "C", value = 2))), "2");
         client.get(uri!(force_delete(token = "C")));
         client.get(uri!(force_delete(token = "C")));
     }
@@ -148,10 +134,7 @@ mod test {
     fn ensure_cache_is_hashed() {
         let client = TestRocket::new(routes![set, force_delete, get_raw]).client();
         client.get(uri!(force_delete(token = "D")));
-        assert_eq!(
-            client.get_string(uri!(set(token = "D", value = "tacos"))),
-            "tacos"
-        );
+        assert_eq!(&client.get_string(uri!(set(token = "D", value = 1))), "1");
         assert_eq!(client.get_string(uri!(get_raw(token = "D"))), "");
         client.get(uri!(force_delete(token = "D")));
     }
