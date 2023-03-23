@@ -61,8 +61,8 @@ async fn get_id_of_approx(db: &mut Connection<Imagefork>) -> i64 {
     }
 }
 
-static ERROR_IMAGE: Image = Image::new(MediaType::WEBP, include_bytes!("error.webp"));
-static SAFE_IMAGE: Image = Image::new(MediaType::WEBP, include_bytes!("safe.webp"));
+static ERROR_IMAGE: Image = Image::new(MediaType::WEBP, include_bytes!("../images/error.webp"));
+static SAFE_IMAGE: Image = Image::new(MediaType::WEBP, include_bytes!("../images/safe.webp"));
 
 #[get("/<token>")]
 async fn handler(

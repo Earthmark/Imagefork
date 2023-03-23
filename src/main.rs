@@ -21,7 +21,6 @@ use rocket::{
     Build, Config, Rocket,
 };
 use rocket_db_pools::Database;
-use rocket_dyn_templates::Template;
 use rocket_oauth2::OAuth2;
 use thiserror::Error;
 
@@ -66,7 +65,7 @@ pub fn rocket() -> Rocket<Build> {
         .mount("/", portal::auth::github::routes())
         .attach(bind::<portal::token::TokenConfig>())
         .attach(bind::<cache::TokenCacheConfig>())
-        .attach(Template::fairing())
+        .attach(portal::ui::template_fairing())
         .mount("/", portal::routes())
         .mount("/redirect", redirect::routes())
 }
