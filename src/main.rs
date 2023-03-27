@@ -66,6 +66,7 @@ pub fn rocket() -> Rocket<Build> {
         .attach(bind::<portal::token::TokenConfig>())
         .attach(bind::<cache::TokenCacheConfig>())
         .attach(portal::ui::template_fairing())
+        .mount("/", portal::ui::static_files())
         .mount("/", portal::routes())
         .mount("/redirect", redirect::routes())
 }
