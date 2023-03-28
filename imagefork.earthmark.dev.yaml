@@ -57,10 +57,9 @@ metadata:
   labels:
     app: imagefork-core
 data:
-  ROCKET_ENV: production
+  ROCKET_PROFILE: production
   ROCKET_PORT: "80"
-  ROCKET_DATABASES_IMAGEFORK: "postgres://postgres:taconana@imagefork-postggres.default.svc.cluster.local"
-  ROCKET_DATABASES_TOKENS: "redis://imagefork-redis.default.svc.cluster.local"
+  ROCKET_CONFIG: /etc/imagefork/Rocket.toml
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -78,10 +77,20 @@ spec:
     spec:
       containers:
         - name: imagefork-postgres
-          image: ghcr.io//imagefork:latest
-          imagePullPolicy: "Never"
+          image: ghcr.io/earthmark/imagefork:latest
+          imagePullPolicy: "IfNotPresent"
           ports:
             - containerPort: 80
+          volumeMounts:
+          - name: imagefork-core-toml
+            mountPath: /etc/imagefork
+            readOnly: true
           envFrom:
             - configMapRef:
                 name: imagefork-core-config
+            - secretRef:
+                name:  rocket-oauth-github
+      volumes:
+      - name: imagefork-core-toml
+        secret:
+          secretName: imagefork-core-toml
