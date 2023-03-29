@@ -8,7 +8,7 @@ use rocket_db_pools::Connection;
 use thiserror::Error;
 
 pub fn routes() -> Vec<Route> {
-    routes![handler]
+    routes![handler, empty_handler]
 }
 
 #[derive(Error, Debug)]
@@ -81,4 +81,9 @@ async fn handler(
             Either::Right(ERROR_IMAGE.clone())
         }
     }
+}
+
+#[get("/")]
+async fn empty_handler() -> Image {
+    SAFE_IMAGE.clone()
 }
