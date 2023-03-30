@@ -87,10 +87,14 @@ fn portal_server(base: Rocket<Build>) -> Rocket<Build> {
 #[launch]
 pub fn rocket() -> Rocket<Build> {
     let figment = config();
-    match figment.extract_inner("server_kind") {
-        Ok("redirect") => redirect_server(common_server(figment)),
-        Ok("portal") => portal_server(common_server(figment)),
-        _ => portal_server(redirect_server(common_server(figment))),
+    if let Ok(kind) = figment.extract_inner::<String>("server_kind") {
+        match kind.as_ref() {
+            "redirect" => redirect_server(common_server(figment)),
+            "portal" => portal_server(common_server(figment)),
+            _ => panic!("Unknown server kind"),
+        }
+    } else {
+        portal_server(redirect_server(common_server(figment)))
     }
 }
 

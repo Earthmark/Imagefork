@@ -42,7 +42,7 @@ metadata:
 data:
   ROCKET_PROFILE: production
   ROCKET_PORT: "80"
-  ROCKET_CONFIG: /etc/imagefork/Rocket.toml
+  ROCKET_ADDRESS: 0.0.0.0
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -59,14 +59,15 @@ spec:
         app: imagefork-core
     spec:
       containers:
-        - name: imagefork-postgres
-          image: ghcr.io/earthmark/imagefork:latest
+        - name: imagefork-core
+          image: ghcr.io/earthmark/imagefork@sha256:06f71f645a36ee6662e89f6da608ff3d0e086f9e03af0fa4839e24b15367cafa
           imagePullPolicy: "IfNotPresent"
           ports:
             - containerPort: 80
           volumeMounts:
           - name: imagefork-core-toml
-            mountPath: /etc/imagefork
+            mountPath: /usr/local/etc/imagefork/Rocket.toml
+            subPath: Rocket.toml
             readOnly: true
           envFrom:
             - configMapRef:
