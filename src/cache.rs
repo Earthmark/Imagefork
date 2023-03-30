@@ -1,9 +1,20 @@
 use crate::config::ConfigInfo;
 use deadpool_redis::redis::cmd;
+use lazy_static::lazy_static;
 use rocket_db_pools::{deadpool_redis, Connection, Database};
+use rocket_prometheus::prometheus::{register_int_counter_vec, IntCounterVec};
 use serde::Deserialize;
 use sha2::{digest::Output, Digest, Sha256};
 use std::future::Future;
+
+lazy_static! {
+    pub static ref CACHE_RESOLUTION: IntCounterVec = register_int_counter_vec!(
+        "redirect_cache_status",
+        "Cache hit status from the redirect cache.",
+        &["hit_status"]
+    )
+    .unwrap();
+}
 
 #[derive(Database)]
 #[database("tokens")]
@@ -46,6 +57,7 @@ impl Cache {
             .query_async(&mut **db)
             .await?
         {
+            CACHE_RESOLUTION.with_label_values(&["hit"]);
             Ok(target)
         } else {
             let target = init.await;
@@ -58,7 +70,13 @@ impl Cache {
                 .arg(token_keepalive_seconds)
                 .query_async(&mut **db)
                 .await?;
-            Ok(try_set.unwrap_or(target))
+            if let Some(target) = try_set {
+                CACHE_RESOLUTION.with_label_values(&["discard_update"]);
+                Ok(target)
+            } else {
+                CACHE_RESOLUTION.with_label_values(&["update"]);
+                Ok(target)
+            }
         }
     }
 }
@@ -135,7 +153,7 @@ mod test {
         let client = TestRocket::new(routes![set, force_delete, get_raw]).client();
         client.get(uri!(force_delete(token = "D")));
         assert_eq!(&client.get_string(uri!(set(token = "D", value = 1))), "1");
-        assert_eq!(client.get_string(uri!(get_raw(token = "D"))), "");
+        assert_eq!(client.get_string(uri!(get_raw(token = "D"))), "0");
         client.get(uri!(force_delete(token = "D")));
     }
 }

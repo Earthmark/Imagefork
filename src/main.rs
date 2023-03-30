@@ -22,6 +22,7 @@ use rocket::{
 };
 use rocket_db_pools::Database;
 use rocket_oauth2::OAuth2;
+use rocket_prometheus::PrometheusMetrics;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -53,22 +54,44 @@ pub fn config() -> Figment {
     Config::figment().join(Toml::file("Secrets.toml").nested())
 }
 
-#[launch]
-pub fn rocket() -> Rocket<Build> {
-    rocket::custom(config())
-        .attach(cache::Cache::init())
+fn common_server(figment: Figment) -> Rocket<Build> {
+    let prometheus = PrometheusMetrics::new();
+    prometheus
+        .registry()
+        .register(Box::new(cache::CACHE_RESOLUTION.clone()))
+        .unwrap();
+    Rocket::custom(figment)
         .attach(db::Imagefork::init())
         .attach(db::Imagefork::init_migrations())
-        //.manage(image_meta::WebImageMetadataAggregator::default())
-        //.manage(portal::auth::AuthClient::default())
-        //.attach(OAuth2::<portal::auth::github::GitHub>::fairing("github"))
-        //.mount("/", portal::auth::github::routes())
-        //.attach(bind::<portal::token::TokenConfig>())
+        .attach(prometheus.clone())
+        .mount("/metrics", prometheus)
+}
+
+fn redirect_server(base: Rocket<Build>) -> Rocket<Build> {
+    base.attach(cache::Cache::init())
         .attach(bind::<cache::TokenCacheConfig>())
-        //.attach(portal::ui::template_fairing())
-        //.mount("/", portal::ui::static_files())
-        //.mount("/", portal::routes())
         .mount("/redirect", redirect::routes())
+}
+
+fn portal_server(base: Rocket<Build>) -> Rocket<Build> {
+    base.manage(image_meta::WebImageMetadataAggregator::default())
+        .manage(portal::auth::AuthClient::default())
+        .attach(OAuth2::<portal::auth::github::GitHub>::fairing("github"))
+        .mount("/", portal::auth::github::routes())
+        .attach(bind::<portal::token::TokenConfig>())
+        .attach(portal::ui::template_fairing())
+        .mount("/", portal::ui::static_files())
+        .mount("/", portal::routes())
+}
+
+#[launch]
+pub fn rocket() -> Rocket<Build> {
+    let figment = config();
+    match figment.extract_inner("server_kind") {
+        Ok("redirect") => redirect_server(common_server(figment)),
+        Ok("portal") => portal_server(common_server(figment)),
+        _ => portal_server(redirect_server(common_server(figment))),
+    }
 }
 
 #[cfg(test)]

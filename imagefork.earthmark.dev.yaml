@@ -2,6 +2,8 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: imagefork-ingress
+  labels:
+    app: imagefork-core
 spec:
   tls:
   - hosts:
@@ -15,35 +17,16 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: imagefork-redirect
-            port:
-              number: 80
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: imagefork-portal
+            name: imagefork-core
             port:
               number: 80
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: imagefork-portal
+  name: imagefork-core
   labels:
-    app: imagefork-portal
-spec:
-  ports:
-    - port: 80
-  selector:
-    app: imagefork-portal
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: imagefork-redirect
-  labels:
-    app: imagefork-redirect
+    app: imagefork-core
 spec:
   ports:
     - port: 80
