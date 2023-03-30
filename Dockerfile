@@ -16,4 +16,4 @@ COPY --from=builder \
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /usr/local/cargo/bin/imagefork /usr/local/bin/imagefork
 WORKDIR /usr/local/etc/imagefork
-#CMD ["imagefork"]
+CMD ["imagefork"]
