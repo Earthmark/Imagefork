@@ -1,8 +1,13 @@
 use crate::{
     cache::{Cache, TokenCacheConfig},
     db::{Imagefork, Poster},
-    image::Image,
 };
+use crate::image::Image;
+use ::image::{
+    codecs::png::{CompressionType, FilterType, PngEncoder},
+    ImageBuffer, ImageEncoder, Pixel,
+};
+use lazy_static::lazy_static;
 use rocket::{http::MediaType, log::private::warn, response::Redirect, Either, Route, State};
 use rocket_db_pools::Connection;
 use thiserror::Error;
@@ -64,12 +69,18 @@ async fn get_id_of_approx(db: &mut Connection<Imagefork>) -> i64 {
 static ERROR_IMAGE: Image = Image::new(MediaType::WEBP, include_bytes!("../images/error.webp"));
 static SAFE_IMAGE: Image = Image::new(MediaType::WEBP, include_bytes!("../images/safe.webp"));
 
-#[get("/<token>")]
+static DEPTH_PIXEL: Image = Image::new(MediaType::PNG, include_bytes!("../images/depth_pixel.png"));
+static NORMAL_PIXEL: Image = Image::new(MediaType::PNG, include_bytes!("../images/normal_pixel.png"));
+static EMISSIVE_PIXEL: Image = Image::new(MediaType::PNG, include_bytes!("../images/emissive_pixel.png"));
+
+#[get("/<token>?<map>&<test>")]
 async fn handler(
     db: Connection<Imagefork>,
     cache: Connection<Cache>,
     config: &State<TokenCacheConfig>,
     token: Option<&str>,
+    map: Option<&str>,
+    test: Option<i64>,
 ) -> Either<Redirect, Image> {
     match handle_redirect_internal(db, cache, config, token).await {
         Ok(Some(url)) => Either::Left(Redirect::found(url)),

@@ -9,7 +9,7 @@ use std::future::Future;
 
 lazy_static! {
     pub static ref CACHE_RESOLUTION: IntCounterVec = register_int_counter_vec!(
-        "redirect_cache_status",
+        "imagefork_redirect_cache_status",
         "Cache hit status from the redirect cache.",
         &["hit_status"]
     )

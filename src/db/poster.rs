@@ -15,6 +15,13 @@ pub struct Poster {
     serveable: bool,
 }
 
+pub enum PosterMapKind {
+    Albedo,
+    Normal,
+    Height,
+    Specular,
+}
+
 impl Poster {
     pub async fn get(
         db: &mut Connection<Imagefork>,

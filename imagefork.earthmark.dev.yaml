@@ -27,6 +27,9 @@ metadata:
   name: imagefork-core
   labels:
     app: imagefork-core
+  annotations:
+    prometheus.io/scrape: 'true'
+    prometheus.io/port: '80'
 spec:
   ports:
     - port: 80
