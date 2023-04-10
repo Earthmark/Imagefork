@@ -1,16 +1,10 @@
 {{#*inline "head"}}
-<script>
-  $(document).ready(() => {
-    $.getJSON("/posters").done((posters) => {
-      
-    }).fail(() => {
-      
-    });
-
-    $("#add-poster").click(() => {
-      
-    })
-  })
+<script type="importmap">
+  {
+    "imports": {
+      "vue": "https://unpkg.com/vue@3/dist/vue.esm-browser.js"
+    }
+  }
 </script>
 {{/inline}}
 
