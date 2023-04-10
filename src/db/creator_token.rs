@@ -13,6 +13,7 @@ pub struct CreatorToken {
     minting_time: NaiveDateTime,
     pub moderator: bool,
     pub lockout: bool,
+    pub poster_limit: i32,
 }
 
 fn generate_token() -> String {
@@ -29,7 +30,7 @@ impl CreatorToken {
     pub async fn get_by_token(db: &mut Connection<Imagefork>, token: &str) -> Result<Option<Self>> {
         let token = sqlx::query_as!(
             Self,
-            r#"SELECT id, token AS "token!", minting_time AS "minting_time!", moderator, lockout
+            r#"SELECT id, token AS "token!", minting_time AS "minting_time!", moderator, lockout, poster_limit
           FROM Creators WHERE token = $1 LIMIT 1"#,
             token
         )
@@ -47,7 +48,7 @@ impl CreatorToken {
             r#"UPDATE Creators
             SET token = $1, minting_time = (now() at time zone 'utc')
             WHERE id = $2
-            RETURNING id, token AS "token!", minting_time AS "minting_time!", moderator, lockout"#,
+            RETURNING id, token AS "token!", minting_time AS "minting_time!", moderator, lockout, poster_limit"#,
             token,
             id
         )
@@ -63,7 +64,7 @@ impl CreatorToken {
           r#"INSERT INTO Creators (email, token, minting_time) VALUES ($1, $2, (now() at time zone 'utc'))
           ON CONFLICT (email)
           DO UPDATE SET token = $2, minting_time = (now() at time zone 'utc')
-          RETURNING id, token AS "token!", minting_time AS "minting_time!", moderator, lockout"#,
+          RETURNING id, token AS "token!", minting_time AS "minting_time!", moderator, lockout, poster_limit"#,
           email,
           token,
       )

@@ -2,27 +2,25 @@ use crate::db::Creator;
 use crate::db::CreatorToken;
 use crate::db::Imagefork;
 use crate::db::Poster;
-use rocket::http::Status;
-use rocket::response::status::Unauthorized;
+use crate::{Error, Error::*, Result};
+use rocket::form::Form;
+use rocket::response::Redirect;
 use rocket::serde::json::Json;
-use rocket::Either;
 use rocket_db_pools::Connection;
 use serde::Deserialize;
-
-use crate::Result;
 
 pub fn routes() -> Vec<rocket::Route> {
     routes![
         get_posters,
-        get_posters_no_token,
         get_poster,
-        get_poster_no_token,
-        post_poster,
-        post_poster_no_token
+        post_poster_json,
+        post_poster_html,
+        put_poster_json,
+        put_poster_html
     ]
 }
 
-#[get("/poster", format = "json")]
+#[get("/posters", format = "json")]
 async fn get_posters(
     token: &CreatorToken,
     mut db: Connection<Imagefork>,
@@ -30,12 +28,7 @@ async fn get_posters(
     Ok(Poster::get_all_by_creator(&mut db, token.id).await?.into())
 }
 
-#[get("/poster", format = "json", rank = 2)]
-fn get_posters_no_token() -> Unauthorized<()> {
-    Unauthorized(None)
-}
-
-#[get("/poster/<id>", format = "json")]
+#[get("/posters/<id>", format = "json")]
 async fn get_poster(
     token: &CreatorToken,
     mut db: Connection<Imagefork>,
@@ -44,41 +37,91 @@ async fn get_poster(
     Ok(Poster::get(&mut db, id, token.id).await?.map(Into::into))
 }
 
-#[get("/poster/<_>", format = "json", rank = 2)]
-fn get_poster_no_token() -> Unauthorized<()> {
-    Unauthorized(None)
-}
-
-#[derive(Deserialize)]
+#[derive(Deserialize, FromForm)]
 struct PosterCreate {
     url: String,
 }
 
-#[post("/poster", format = "json", data = "<poster>")]
 async fn post_poster(
     token: &CreatorToken,
     mut db: Connection<Imagefork>,
-    poster: Json<PosterCreate>,
-) -> Result<Either<Json<Poster>, (Status, ())>> {
+    poster: &PosterCreate,
+) -> Result<Poster> {
     if token.lockout {
-        return Ok(Either::Right((Status::Unauthorized, ())));
+        return Err(LockedOut);
     }
 
     if Creator::can_add_posters(&mut db, token.id).await? != Some(true) {
-        return Ok(Either::Right((Status::Forbidden, ())));
+        return Err(TooManyPosters);
     }
 
-    let poster = Poster::post(&mut db, token.id, &poster.url)
+    // TODO: Verify a poster can be retrieved.
+
+    let poster = Poster::create(&mut db, token.id, &poster.url)
         .await?
-        .ok_or(crate::Error::SystemError(
-            "Failed to create poster.".to_string(),
-        ))?;
-    Ok(Either::Left(poster.into()))
+        .ok_or(Error::internal_from("Failed to create poster."))?;
+    Ok(poster)
 }
 
-#[post("/poster", format = "json", rank = 2)]
-fn post_poster_no_token() -> Unauthorized<()> {
-    Unauthorized(None)
+#[post("/posters", format = "json", data = "<poster>")]
+async fn post_poster_json(
+    token: &CreatorToken,
+    db: Connection<Imagefork>,
+    poster: Json<PosterCreate>,
+) -> Result<Json<Poster>> {
+    Ok(post_poster(token, db, &poster).await?.into())
+}
+
+#[post("/posters", data = "<poster>", rank = 2)]
+async fn post_poster_html(
+    token: &CreatorToken,
+    db: Connection<Imagefork>,
+    poster: Form<PosterCreate>,
+) -> Result<Redirect> {
+    post_poster(token, db, &poster).await?;
+    Ok(Redirect::to(uri!(super::ui::posters)))
+}
+
+#[derive(Deserialize, FromForm)]
+struct PosterModify {
+    stopped: bool,
+}
+
+async fn put_poster(
+    token: &CreatorToken,
+    mut db: Connection<Imagefork>,
+    id: i64,
+    poster: &PosterModify,
+) -> Result<Poster> {
+    if token.lockout {
+        return Err(LockedOut);
+    }
+
+    let poster = Poster::update(&mut db, token.id, id, poster.stopped)
+        .await?
+        .ok_or(Error::internal_from("Failed to create poster."))?;
+    Ok(poster)
+}
+
+#[put("/posters/<id>", data = "<poster>")]
+async fn put_poster_json(
+    token: &CreatorToken,
+    db: Connection<Imagefork>,
+    id: i64,
+    poster: Json<PosterModify>,
+) -> Result<Json<Poster>> {
+    Ok(put_poster(token, db, id, &poster).await?.into())
+}
+
+#[post("/posters/<id>", data = "<poster>", rank = 2)]
+async fn put_poster_html(
+    token: &CreatorToken,
+    db: Connection<Imagefork>,
+    id: i64,
+    poster: Form<PosterModify>,
+) -> Result<Redirect> {
+    put_poster(token, db, id, &poster).await?;
+    Ok(Redirect::to(uri!(super::ui::posters)))
 }
 
 #[cfg(test)]
@@ -111,7 +154,7 @@ mod test {
         user.login();
         let creator: Vec<Poster> = client.get_json(uri!(super::get_posters()));
         assert_eq!(creator.len(), 0);
-        
+
         assert_eq!(
             client.get(uri!(super::get_posters)).class(),
             StatusClass::Success

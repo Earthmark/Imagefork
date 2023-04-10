@@ -55,7 +55,7 @@ impl CreatorToken {
 
 #[async_trait]
 impl<'r> FromRequest<'r> for &'r CreatorToken {
-    type Error = std::convert::Infallible;
+    type Error = crate::Error;
 
     async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
         let user_ref = request
@@ -86,7 +86,9 @@ impl<'r> FromRequest<'r> for &'r CreatorToken {
                 }
             })
             .await;
-        user_ref.as_ref().or_forward(())
+        user_ref
+            .as_ref()
+            .into_outcome(crate::Error::NotLoggedIn.with_status())
     }
 }
 
@@ -94,14 +96,14 @@ pub struct ModeratorToken<'a>(pub &'a CreatorToken);
 
 #[async_trait]
 impl<'r> FromRequest<'r> for ModeratorToken<'r> {
-    type Error = std::convert::Infallible;
+    type Error = crate::Error;
 
     async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
         let creator = try_outcome!(request.guard::<&CreatorToken>().await);
         if creator.moderator {
             Outcome::Success(ModeratorToken(creator))
         } else {
-            Outcome::Forward(())
+            Outcome::Failure(crate::Error::UserNotAdmin.with_status())
         }
     }
 }

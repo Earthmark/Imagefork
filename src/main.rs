@@ -8,6 +8,7 @@ mod image;
 mod image_meta;
 mod portal;
 mod redirect;
+mod error;
 
 use config::bind;
 use rocket::{
@@ -15,9 +16,6 @@ use rocket::{
         providers::{Format, Toml},
         Figment,
     },
-    http::Status,
-    log::private::warn,
-    response::Responder,
     Build, Config, Rocket,
 };
 use rocket_db_pools::Database;
@@ -25,30 +23,7 @@ use rocket_oauth2::OAuth2;
 use rocket_prometheus::PrometheusMetrics;
 use thiserror::Error;
 
-#[derive(Error, Debug)]
-pub enum Error {
-    #[error("Sql: {0}")]
-    Sqlx(#[from] sqlx::Error),
-    #[error("Rocket: {0}")]
-    Rocket(#[from] rocket::Error),
-    #[error("Reqwest: {0}")]
-    Reqwest(#[from] reqwest::Error),
-    #[error("Serde Json: {0}")]
-    SerdeJson(#[from] serde_json::Error),
-    #[error("Redis: {0}")]
-    Redis(#[from] rocket_db_pools::deadpool_redis::redis::RedisError),
-    #[error("System: {0}")]
-    SystemError(String),
-}
-
-type Result<T> = std::result::Result<T, Error>;
-
-impl<'r, 'o: 'r> Responder<'r, 'o> for Error {
-    fn respond_to(self, request: &'r rocket::Request<'_>) -> rocket::response::Result<'o> {
-        warn!("Error: {}", self);
-        (Status::InternalServerError, "Internal server error.").respond_to(request)
-    }
-}
+pub use error::*;
 
 pub fn config() -> Figment {
     Config::figment().join(Toml::file("Secrets.toml").nested())

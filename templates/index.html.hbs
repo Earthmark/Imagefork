@@ -1,8 +1,7 @@
-{{#*inline "page"}}
-
-<h1 class="text-3xl font-bold underline">
-  Hello world!
-</h1>
-
-{{/inline}}
-{{> base}}
+{{#> base title="Hello!"}}
+  <div class="col-lg-3">
+    {{#> card title="Welcome"}}
+      Describe the thing
+    {{/card}}
+  </div>
+{{/base}}

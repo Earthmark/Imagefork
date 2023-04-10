@@ -1,0 +1,80 @@
+{{#*inline "head"}}
+<script>
+  $(document).ready(() => {
+    $.getJSON("/posters").done((posters) => {
+      
+    }).fail(() => {
+      
+    });
+
+    $("#add-poster").click(() => {
+      
+    })
+  })
+</script>
+{{/inline}}
+
+{{#> base title="Posters"}}
+  <div class="col-8">
+    {{#> card title="Configure"}}
+      Configure your posters here.
+      <table class="table">
+        <thead>
+          <tr>
+            <th scope="col">ID</th>
+            <th scope="col">Image</th>
+            <th scope="col">Status</th>
+            <th scope="col" colspan="2"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each posters}}
+          <tr class="
+              {{#if lockout}}
+              table-danger
+              {{else if stopped}}
+              table-success
+              {{else}}
+              table-secondary
+              {{/if}}
+              "
+            >
+            <th scope="col">{{id}}</th>
+            <td><a href="{{url}}">link</a></td>
+            <td>
+              {{#if lockout}}Restricted
+              {{else if stopped}}Paused
+              {{else}}Serving
+              {{/if}}
+            </td>
+            <td>
+              <form accept="/posters/{{id}}" method="post">
+                <input type="hidden" name="stopped" value="{{#if stopped}}false{{else}}true{{/if}}"/>
+                <button type="submit"
+                  class="btn {{#if stopped}}btn-secondary{{else}}btn-primary{{/if}}"
+                  {{#if lockout}}disabled{{/if}}>
+                  {{#if stopped}}Serve{{else}}Pause{{/if}}
+                </button>
+              </form>
+            </td>
+            <td>
+              <button type="button" class="btn btn-outline-danger" {{#if lockout}}disabled{{/if}}>Delete</button>
+            </td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+      <form>
+        <div class="input-group mb-3">
+          <span class="input-group-text">{{len posters}}/{{poster_limit}}</span>
+          <input type="text" name="url" class="form-control"
+            placeholder="https://example.com/image.png" aria-label="Poster URL"
+            id="poster-to-add"
+            {{#unless under_limit}}disabled{{/unless}}>
+          <input class="btn btn-primary" type="submit" value="Add Poster" id="add-poster"
+            {{#unless under_limit}}disabled{{/unless}}>
+        </div>
+      </form>
+    {{/card}}
+  </div>
+{{/base}}

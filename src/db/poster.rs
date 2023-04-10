@@ -18,8 +18,8 @@ pub struct Poster {
 impl Poster {
     pub async fn get(
         db: &mut Connection<Imagefork>,
-        poster_id: i64,
         creator_id: i64,
+        poster_id: i64,
     ) -> Result<Option<Self>> {
         sqlx::query_as!(
             Self,
@@ -31,16 +31,29 @@ impl Poster {
         .await
     }
 
+    pub async fn get_unsafe(
+        db: &mut Connection<Imagefork>,
+        poster_id: i64,
+    ) -> Result<Option<Self>> {
+        sqlx::query_as!(
+            Self,
+            "SELECT * FROM Posters WHERE id = $1 LIMIT 1",
+            poster_id,
+        )
+        .fetch_optional(&mut **db)
+        .await
+    }
+
     pub async fn get_all_by_creator(
         db: &mut Connection<Imagefork>,
         creator_id: i64,
     ) -> Result<Vec<Self>> {
-        sqlx::query_as!(Self, "SELECT * FROM Posters WHERE creator = $1", creator_id)
+        sqlx::query_as!(Self, "SELECT * FROM Posters WHERE creator = $1 ORDER BY id", creator_id)
             .fetch_all(&mut **db)
             .await
     }
 
-    pub async fn post(
+    pub async fn create(
         db: &mut Connection<Imagefork>,
         creator_id: i64,
         url: &str,
@@ -54,6 +67,27 @@ impl Poster {
             ",
             creator_id,
             url,
+        )
+        .fetch_optional(&mut **db)
+        .await
+    }
+
+    pub async fn update(
+        db: &mut Connection<Imagefork>,
+        creator_id: i64,
+        poster_id: i64,
+        stopped: bool,
+    ) -> Result<Option<Self>> {
+        sqlx::query_as!(
+            Self,
+            "UPDATE Posters
+            SET stopped = $3
+            WHERE id = $1 AND creator = $2
+            RETURNING *;
+            ",
+            poster_id,
+            creator_id,
+            stopped,
         )
         .fetch_optional(&mut **db)
         .await
@@ -102,7 +136,18 @@ mod test {
         poster_id: i64,
         creator_id: i64,
     ) -> Option<Json<Poster>> {
-        Poster::get(&mut db, poster_id, creator_id)
+        Poster::get(&mut db, creator_id, poster_id)
+            .await
+            .unwrap()
+            .map(Into::into)
+    }
+
+    #[get("/test/get-unsafe-poster?<poster_id>")]
+    async fn get_poster_unsafe(
+        mut db: Connection<Imagefork>,
+        poster_id: i64,
+    ) -> Option<Json<Poster>> {
+        Poster::get_unsafe(&mut db, poster_id)
             .await
             .unwrap()
             .map(Into::into)
@@ -122,7 +167,7 @@ mod test {
         creator_id: i64,
         url: &str,
     ) -> Option<Json<Poster>> {
-        Poster::post(&mut db, creator_id, url)
+        Poster::create(&mut db, creator_id, url)
             .await
             .unwrap()
             .map(Into::into)
@@ -130,7 +175,7 @@ mod test {
 
     #[test]
     fn new_user_has_no_posters() {
-        let client = TestRocket::new(routes![get_poster, get_all_for, add_poster]).client();
+        let client = TestRocket::new(routes![get_poster, get_poster_unsafe, get_all_for, add_poster]).client();
         let token = client.creator("p1");
 
         let posters: Vec<Poster> = client.get_json(uri!(get_all_for(creator_id = token.id())));
@@ -139,7 +184,7 @@ mod test {
 
     #[test]
     fn new_user_has_poster_limit() {
-        let client = TestRocket::new(routes![get_poster, get_all_for, add_poster]).client();
+        let client = TestRocket::new(routes![get_poster, get_poster_unsafe, get_all_for, add_poster]).client();
         let token = client.creator("p2");
 
         let creator: Creator = client.get_json(uri!(get_creator(id = token.id())));
