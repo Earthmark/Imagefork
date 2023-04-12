@@ -18,8 +18,8 @@ impl Creator {
     pub async fn get(db: &mut Connection<Imagefork>, id: i64) -> Result<Option<Self>> {
         sqlx::query_as!(
             Self,
-            "SELECT id, email, creation_time, lockout, moderator, poster_limit
-            FROM Creators WHERE id = $1 LIMIT 1",
+            r#"SELECT id, email, creation_time, lockout, moderator, poster_limit
+            FROM Creators WHERE id = $1 LIMIT 1"#r,
             id
         )
         .fetch_optional(&mut **db)

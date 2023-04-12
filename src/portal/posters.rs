@@ -3,8 +3,6 @@ use crate::db::CreatorToken;
 use crate::db::Imagefork;
 use crate::db::Poster;
 use crate::{Error, Error::*, Result};
-use rocket::form::Form;
-use rocket::response::Redirect;
 use rocket::serde::json::Json;
 use rocket_db_pools::Connection;
 use serde::Deserialize;
@@ -13,10 +11,9 @@ pub fn routes() -> Vec<rocket::Route> {
     routes![
         get_posters,
         get_poster,
-        post_poster_json,
-        post_poster_html,
-        put_poster_json,
-        put_poster_html
+        post_poster,
+        put_poster,
+        delete_poster,
     ]
 }
 
@@ -42,11 +39,12 @@ struct PosterCreate {
     url: String,
 }
 
+#[post("/posters", format = "json", data = "<poster>")]
 async fn post_poster(
     token: &CreatorToken,
     mut db: Connection<Imagefork>,
-    poster: &PosterCreate,
-) -> Result<Poster> {
+    poster: Json<PosterCreate>,
+) -> Result<Json<Poster>> {
     if token.lockout {
         return Err(LockedOut);
     }
@@ -60,26 +58,7 @@ async fn post_poster(
     let poster = Poster::create(&mut db, token.id, &poster.url)
         .await?
         .ok_or(Error::internal_from("Failed to create poster."))?;
-    Ok(poster)
-}
-
-#[post("/posters", format = "json", data = "<poster>")]
-async fn post_poster_json(
-    token: &CreatorToken,
-    db: Connection<Imagefork>,
-    poster: Json<PosterCreate>,
-) -> Result<Json<Poster>> {
-    Ok(post_poster(token, db, &poster).await?.into())
-}
-
-#[post("/posters", data = "<poster>", rank = 2)]
-async fn post_poster_html(
-    token: &CreatorToken,
-    db: Connection<Imagefork>,
-    poster: Form<PosterCreate>,
-) -> Result<Redirect> {
-    post_poster(token, db, &poster).await?;
-    Ok(Redirect::to(uri!(super::ui::posters)))
+    Ok(poster.into())
 }
 
 #[derive(Deserialize, FromForm)]
@@ -87,41 +66,37 @@ struct PosterModify {
     stopped: bool,
 }
 
+#[put("/posters/<id>", data = "<poster>")]
 async fn put_poster(
     token: &CreatorToken,
     mut db: Connection<Imagefork>,
     id: i64,
-    poster: &PosterModify,
-) -> Result<Poster> {
+    poster: Json<PosterModify>,
+) -> Result<Json<Poster>> {
     if token.lockout {
         return Err(LockedOut);
     }
 
     let poster = Poster::update(&mut db, token.id, id, poster.stopped)
         .await?
-        .ok_or(Error::internal_from("Failed to create poster."))?;
-    Ok(poster)
+        .ok_or(Error::internal_from("Failed update poster."))?;
+    Ok(poster.into())
 }
 
-#[put("/posters/<id>", data = "<poster>")]
-async fn put_poster_json(
+#[delete("/posters/<id>")]
+async fn delete_poster(
     token: &CreatorToken,
-    db: Connection<Imagefork>,
+    mut db: Connection<Imagefork>,
     id: i64,
-    poster: Json<PosterModify>,
 ) -> Result<Json<Poster>> {
-    Ok(put_poster(token, db, id, &poster).await?.into())
-}
+    if token.lockout {
+        return Err(LockedOut);
+    }
 
-#[post("/posters/<id>", data = "<poster>", rank = 2)]
-async fn put_poster_html(
-    token: &CreatorToken,
-    db: Connection<Imagefork>,
-    id: i64,
-    poster: Form<PosterModify>,
-) -> Result<Redirect> {
-    put_poster(token, db, id, &poster).await?;
-    Ok(Redirect::to(uri!(super::ui::posters)))
+    let poster = Poster::delete(&mut db, token.id, id)
+        .await?
+        .ok_or(Error::internal_from("Failed update poster."))?;
+    Ok(poster.into())
 }
 
 #[cfg(test)]

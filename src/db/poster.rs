@@ -93,6 +93,24 @@ impl Poster {
         .await
     }
 
+    pub async fn delete(
+        db: &mut Connection<Imagefork>,
+        creator_id: i64,
+        poster_id: i64,
+    ) -> Result<Option<Self>> {
+        sqlx::query_as!(
+            Self,
+            "DELETE FROM Posters
+            WHERE id = $1 AND creator = $2
+            RETURNING *;
+            ",
+            poster_id,
+            creator_id,
+        )
+        .fetch_optional(&mut **db)
+        .await
+    }
+
     pub async fn get_id_of_approx(db: &mut Connection<Imagefork>) -> Result<Option<i64>> {
         struct FoundPoster {
             id: i64,
