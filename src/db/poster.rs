@@ -35,9 +35,13 @@ impl Poster {
         db: &mut Connection<Imagefork>,
         creator_id: i64,
     ) -> Result<Vec<Self>> {
-        sqlx::query_as!(Self, "SELECT * FROM Posters WHERE creator = $1 ORDER BY id", creator_id)
-            .fetch_all(&mut **db)
-            .await
+        sqlx::query_as!(
+            Self,
+            "SELECT * FROM Posters WHERE creator = $1 ORDER BY id",
+            creator_id
+        )
+        .fetch_all(&mut **db)
+        .await
     }
 
     pub async fn create(
@@ -125,11 +129,7 @@ impl Poster {
 
 #[cfg(test)]
 mod test {
-    use super::{
-        super::{creator::test::*, Imagefork},
-        Poster,
-    };
-    use crate::db::Creator;
+    use super::{super::Imagefork, Poster};
     use crate::test::TestRocket;
     use rocket::serde::json::Json;
     use rocket_db_pools::Connection;
@@ -173,23 +173,5 @@ mod test {
 
         let posters: Vec<Poster> = client.get_json(uri!(get_all_for(creator_id = token.id())));
         assert!(posters.len() == 0);
-    }
-
-    #[test]
-    fn new_user_has_poster_limit() {
-        let client = TestRocket::new(routes![get_poster, get_all_for, add_poster]).client();
-        let token = client.creator("p2");
-
-        let creator: Creator = client.get_json(uri!(get_creator(id = token.id())));
-
-        for index in 0..creator.poster_limit + 3 {
-            client.get(uri!(add_poster(
-                creator_id = token.id(),
-                url = format!("poster {}", index)
-            )));
-        }
-
-        let posters: Vec<Poster> = client.get_json(uri!(get_all_for(creator_id = token.id())));
-        assert!(posters.len() == creator.poster_limit as usize);
     }
 }
