@@ -1,4 +1,3 @@
-use crate::db::Creator;
 use crate::db::CreatorToken;
 use crate::db::Imagefork;
 use crate::db::Poster;
@@ -47,10 +46,6 @@ async fn post_poster(
 ) -> Result<Json<Poster>> {
     if token.lockout {
         return Err(LockedOut);
-    }
-
-    if Creator::can_add_posters(&mut db, token.id).await? != Some(true) {
-        return Err(TooManyPosters);
     }
 
     // TODO: Verify a poster can be retrieved.

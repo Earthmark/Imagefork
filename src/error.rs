@@ -6,8 +6,6 @@ use thiserror::Error;
 #[derive(Error, Debug, Serialize)]
 #[serde(tag = "type")]
 pub enum Error {
-    #[error("Creator has too many posters")]
-    TooManyPosters,
     #[error("User is not logged in")]
     NotLoggedIn,
     #[error("Operation is not allowed as the user is locked out")]
@@ -24,7 +22,6 @@ impl Error {
     }
     fn get_status(&self) -> Status {
         match self {
-            Error::TooManyPosters => Status::BadRequest,
             Error::NotLoggedIn => Status::Unauthorized,
             Error::UserNotAdmin => Status::Unauthorized,
             Error::LockedOut => Status::Forbidden,
@@ -33,7 +30,6 @@ impl Error {
     }
     fn get_json_error(&self) -> &'static str {
         match self {
-            Error::TooManyPosters => "Creator has too many posters and can not add more, remove some existing posters to add new ones.",
             Error::NotLoggedIn => "User is not logged in, use /login/github to log in.",
             Error::UserNotAdmin => "Admin is required.",
             Error::LockedOut => "Creator is locked out due to moderator review, contact support for assistance.",

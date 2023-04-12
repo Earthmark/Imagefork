@@ -25,26 +25,6 @@ impl Creator {
         .fetch_optional(&mut **db)
         .await
     }
-
-    pub async fn can_add_posters(
-        db: &mut Connection<Imagefork>,
-        creator_id: i64,
-    ) -> Result<Option<bool>> {
-        struct CanAddPoster {
-            can_add: bool,
-        }
-
-        Ok(sqlx::query_as!(
-            CanAddPoster,
-            r#"SELECT poster_limit > (SELECT COUNT(*) FROM Posters WHERE creator = Creators.id) AS "can_add!"
-            FROM Creators WHERE id = $1
-            "#,
-            creator_id,
-        )
-        .fetch_optional(&mut **db)
-        .await?
-        .map(|c| c.can_add))
-    }
 }
 
 #[cfg(test)]

@@ -10,8 +10,8 @@
         type : 'PUT',
       }).done(poster => {
         updatePoster(poster, $poster);
-      }).fail(() => {
-        alert("error");
+      }).fail(e => {
+        alert("error" + e);
       });
   }
 
@@ -20,7 +20,7 @@
     $p.find(".poster-id").text("" + p.id);
     $p.find(".poster-url").attr({
       href: p.url
-    });
+    }).text(p.url);
     const status = p.lockout ? "Locked" : p.stopped ? "Stopped" : "Serving";
     $p.find(".poster-status").text(status);
     $p.find(".poster-pause")
@@ -42,42 +42,37 @@
         alert("error");
       });
   }
-
-  $(document).ready(() => {
-    const $row_template = $("#poster-row-template").contents();
-    const $poster_container = $("#poster-container");
-
-    const sortPosters = () => {
-      $poster_container.sort((a, b) => {
+    function sortPosters() {
+      $("#poster-container").sort((a, b) => {
         const ai = $(a).data("id");
         const bi = $(b).data("id");
         return (ai < bi) ? -1 : (ai > bi) ? 1 : 0;
       });
-    };
+    }
 
-    const removeUnknownPosters = (knownPosters) => {
+    function removeUnknownPosters(knownPosters) {
       $(".poster").each((_, post) => {
         const $post = $(post);
         if (!knownPosters.find(item => item.id == $post.data("id"))) {
           $post.remove();
         }
       });
-    };
+    }
 
-    const rebuildPosters = (posters) => {
+    function rebuildPosters(posters) {
       appendPosters(posters);
       removeUnknownPosters(posters);
-    };
+    }
 
-    const appendPosters = (posters) => {
+    function appendPosters(posters) {
       for (poster of posters) {
         var $p = $("#poster-" + poster.id);
         if (!$p.length) {
-          $p = $row_template.clone();
+          $p = $("#poster-row-template").contents().clone();
           $p.attr({
             id: "poster-" + poster.id
           });
-          $p.appendTo($poster_container)
+          $p.appendTo($("#poster-container"))
         }
         console.log($p)
         updatePoster(poster, $p);
@@ -85,38 +80,47 @@
       sortPosters();
     }
 
-    $.getJSON("/posters", (posters) => {
-      rebuildPosters(posters);
+  function addPoster(submitEvent) {
+    submitEvent.preventDefault();
+    $.ajax("/posters", {
+      data: JSON.stringify({url: $("#poster-to-add").val()}),
+      dataType: 'json',
+      contentType: 'application/json',
+      type : 'POST',
+    }).done(data => {
+      appendPosters([data]);
+    }).fail(e => {
+      alert("error" + e);
     });
+  }
 
-    $("#add-poster").click(() => {
-      $.ajax("/posters", {
-        data: JSON.stringify({url: $("#poster-to-add").val()}),
-        dataType: 'json',
-        contentType: 'application/json',
-        type : 'POST',
-      }).done(data => {
-        appendPosters([data]);
-      }).fail(() => {
-        alert("error");
-      });
+  $(document).ready(() => {
+    $.ajax("/posters", {
+      dataType: 'json',
+    }).done(posters => {
+      rebuildPosters(posters);
+    }).fail(e => {
+      alert("error" + e);
     });
-  })
+  });
 </script>
 {{/inline}}
 
 {{#> base title="Posters"}}
   <div class="col-8">
     {{#> card title="Configure"}}
-      Configure your posters here.
       <table class="table">
         <template id="poster-row-template">
           <tr class="poster">
             <th class="poster-id" scope="col">TEMP_ID</th>
-            <td><a role="button" class="btn btn-link poster-url" href="TEMP_LINK">link</a></td>
             <td class="poster-status">TEMP_STATUS</td>
-            <td><button class="poster-pause btn btn-primary" onclick="unpausePoster(this)">TEMP_SUBMIT_BUTTON</button></td>
-            <td><button class="poster-delete btn btn-outline-danger" onclick="deletePoster(this)">Delete</button></td>
+            <td>
+              <div class="btn-group" role="group">
+                <button class="poster-pause btn btn-primary" onclick="unpausePoster(this)">TEMP_SUBMIT_BUTTON</button>
+                <button class="poster-delete btn btn-outline-danger" onclick="deletePoster(this)">Delete</button>
+              </div>
+            </td>
+            <td><a role="button" class="btn btn-link poster-url" href="TEMP_LINK">link</a></td>
           </tr>
         </template>
         <thead>
@@ -124,49 +128,17 @@
             <th scope="col">ID</th>
             <th scope="col">Image</th>
             <th scope="col">Status</th>
-            <th scope="col" colspan="2"></th>
+            <th scope="col"></th>
           </tr>
         </thead>
         <tbody id="poster-container">
-          {{!--{{#each posters}}
-          <tr class="
-              {{#if lockout}}
-              table-danger
-              {{else if stopped}}
-              table-success
-              {{else}}
-              table-secondary
-              {{/if}}
-              "
-            >
-            <th scope="col">{{id}}</th>
-            <td><a href="{{url}}">link</a></td>
-            <td>
-              {{#if lockout}}Restricted
-              {{else if stopped}}Paused
-              {{else}}Serving
-              {{/if}}
-            </td>
-            <td>
-              <form>
-                <input type="hidden" name="stopped" value="{{#if stopped}}false{{else}}true{{/if}}"/>
-                <button
-                  class="btn {{#if stopped}}btn-secondary{{else}}btn-primary{{/if}}"
-                  {{#if lockout}}disabled{{/if}}>
-                  {{#if stopped}}Serve{{else}}Pause{{/if}}
-                </button>
-              </form>
-            </td>
-            <td>
-              <button class="btn btn-outline-danger" {{#if lockout}}disabled{{/if}}>Delete</button>
-            </td>
-          </tr>
-          {{/each}}--}}
         </tbody>
       </table>
       <div class="input-group mb-3">
-        <input type="text" name="url" class="form-control" placeholder="https://example.com/image.png" aria-label="Poster URL" id="poster-to-add">
-        <button class="btn btn-primary" id="add-poster">Add Poster</button>
+        <form onsubmit="addPoster(event)" class="input-group">
+          <input type="url" name="url" class="form-control" placeholder="https://example.com/image.png" aria-label="Poster URL" id="poster-to-add" required>
+          <button type="submit" class="btn btn-primary" id="add-poster">Add Poster</button>
+        </form>
       </div>
     {{/card}}
   </div>

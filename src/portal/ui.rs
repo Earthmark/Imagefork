@@ -1,7 +1,8 @@
-use crate::db::{CreatorToken, Imagefork, Poster};
+use crate::db::CreatorToken;
 use crate::Result;
+use rocket::response::Redirect;
+use rocket::Either;
 use rocket::{fairing::Fairing, Route};
-use rocket_db_pools::Connection;
 use rocket_dyn_templates::{context, Template};
 
 pub fn routes() -> Vec<Route> {
@@ -19,18 +20,17 @@ fn index(token: Option<&CreatorToken>) -> Template {
 }
 
 #[get("/posters", format = "html", rank = 2)]
-pub async fn posters(mut db: Connection<Imagefork>, token: &CreatorToken) -> Result<Template> {
-    let posters = Poster::get_all_by_creator(&mut db, token.id).await?;
-    Ok(Template::render(
-        "posters",
-        context! {
-            moderator: token.moderator,
-            lockout: token.lockout,
-            poster_limit: token.poster_limit,
-            under_limit: posters.len() < token.poster_limit as usize,
-            posters,
-        },
-    ))
+pub async fn posters<'r>(token: Option<&CreatorToken>) -> Result<Either<Template, Redirect>> {
+    Ok(if token.is_some() {
+        Either::Left(Template::render(
+            "posters",
+            context! {
+                not_logged_in: token.is_none()
+            },
+        ))
+    } else {
+        Either::Right(Redirect::to(uri!(index)))
+    })
 }
 
 pub fn template_fairing() -> impl Fairing {
