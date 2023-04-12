@@ -47,7 +47,7 @@ async fn github_callback(
             .send()
             .await?;
     if response.status() != StatusCode::OK {
-        return Err(crate::Error::SystemError(format!(
+        return Err(crate::Error::internal_from(format!(
             "Invalid status code: {}: {}",
             response.status(),
             response.text().await?
@@ -58,7 +58,7 @@ async fn github_callback(
         .into_iter()
         .find(|e| e.primary)
         .map(|e| e.email)
-        .ok_or(crate::Error::SystemError(
+        .ok_or(crate::Error::internal_from(
             "Oauth did not resolve to a primary email".to_string(),
         ))?;
 

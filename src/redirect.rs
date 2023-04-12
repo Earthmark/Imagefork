@@ -42,7 +42,7 @@ async fn handle_redirect_internal(
         1 => Ok(None),
         id => Poster::get_url(&mut db, id)
             .await
-            .map_err(|e| Error::Actual(e.into())),
+            .map_err(|e| Error::Actual(crate::Error::InternalError(e.into()))),
     }
 }
 

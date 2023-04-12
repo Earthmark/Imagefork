@@ -18,32 +18,12 @@ impl Creator {
     pub async fn get(db: &mut Connection<Imagefork>, id: i64) -> Result<Option<Self>> {
         sqlx::query_as!(
             Self,
-            "SELECT id, email, creation_time, lockout, moderator, poster_limit
-            FROM Creators WHERE id = $1 LIMIT 1",
+            r#"SELECT id, email, creation_time, lockout, moderator, poster_limit
+            FROM Creators WHERE id = $1 LIMIT 1"#r,
             id
         )
         .fetch_optional(&mut **db)
         .await
-    }
-
-    pub async fn can_add_posters(
-        db: &mut Connection<Imagefork>,
-        creator_id: i64,
-    ) -> Result<Option<bool>> {
-        struct CanAddPoster {
-            can_add: bool,
-        }
-
-        Ok(sqlx::query_as!(
-            CanAddPoster,
-            r#"SELECT poster_limit > (SELECT COUNT(*) FROM Posters WHERE creator = Creators.id) AS "can_add!"
-            FROM Creators WHERE id = $1
-            "#,
-            creator_id,
-        )
-        .fetch_optional(&mut **db)
-        .await?
-        .map(|c| c.can_add))
     }
 }
 
