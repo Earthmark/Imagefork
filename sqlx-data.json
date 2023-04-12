@@ -322,26 +322,6 @@
     },
     "query": "INSERT INTO Creators (email, token, minting_time) VALUES ($1, $2, (now() at time zone 'utc'))\n          ON CONFLICT (email)\n          DO UPDATE SET token = $2, minting_time = (now() at time zone 'utc')\n          RETURNING id, token AS \"token!\", minting_time AS \"minting_time!\", moderator, lockout, poster_limit"
   },
-  "44d62d4c430d2f8f260db2c4bc4ff92c9764fbcf6a8c82bbf753c2d354c4c9f2": {
-    "describe": {
-      "columns": [
-        {
-          "name": "can_add!",
-          "ordinal": 0,
-          "type_info": "Bool"
-        }
-      ],
-      "nullable": [
-        null
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      }
-    },
-    "query": "SELECT poster_limit > (SELECT COUNT(*) FROM Posters WHERE creator = Creators.id) AS \"can_add!\"\n            FROM Creators WHERE id = $1\n            "
-  },
   "6cf1693d39a080ce00a589b052052a3db6415de341a8390161dd389b58a7e69b": {
     "describe": {
       "columns": [
@@ -450,83 +430,7 @@
     },
     "query": "UPDATE Posters\n            SET stopped = $3\n            WHERE id = $1 AND creator = $2\n            RETURNING *;\n            "
   },
-  "86ea9612057c8f1a35f36643566990dafbc5258d663e6098184608f14cb24caa": {
-    "describe": {
-      "columns": [
-        {
-          "name": "id",
-          "ordinal": 0,
-          "type_info": "Int8"
-        },
-        {
-          "name": "creator",
-          "ordinal": 1,
-          "type_info": "Int8"
-        },
-        {
-          "name": "creation_time",
-          "ordinal": 2,
-          "type_info": "Timestamp"
-        },
-        {
-          "name": "url",
-          "ordinal": 3,
-          "type_info": "Text"
-        },
-        {
-          "name": "stopped",
-          "ordinal": 4,
-          "type_info": "Bool"
-        },
-        {
-          "name": "lockout",
-          "ordinal": 5,
-          "type_info": "Bool"
-        },
-        {
-          "name": "serveable",
-          "ordinal": 6,
-          "type_info": "Bool"
-        }
-      ],
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      }
-    },
-    "query": "SELECT * FROM Posters WHERE id = $1 LIMIT 1"
-  },
-  "a5dcb17174f912b4903a9b978b21ffc7c4bec68c87aa8e3ca321206b5a12f1a3": {
-    "describe": {
-      "columns": [
-        {
-          "name": "url",
-          "ordinal": 0,
-          "type_info": "Text"
-        }
-      ],
-      "nullable": [
-        false
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      }
-    },
-    "query": "SELECT url FROM Posters WHERE id = $1"
-  },
-  "f6f006aaf3bca7585cb6e646b566bf394eafa6c4af7fdc2e0ab7bd68ea392e41": {
+  "9fbf5b5abdec230adf441de1a895dd67121c4224173cf5d52020afe80eb73c61": {
     "describe": {
       "columns": [
         {
@@ -581,7 +485,27 @@
         ]
       }
     },
-    "query": "INSERT INTO Posters (Creator, Url)\n            SELECT $1, $2\n            WHERE (SELECT COUNT(*) FROM Posters WHERE creator = $1) < (SELECT poster_limit FROM Creators WHERE id = $1 LIMIT 1)\n            RETURNING *;\n            "
+    "query": "INSERT INTO Posters (Creator, Url)\n            SELECT $1, $2\n            RETURNING *;\n            "
+  },
+  "a5dcb17174f912b4903a9b978b21ffc7c4bec68c87aa8e3ca321206b5a12f1a3": {
+    "describe": {
+      "columns": [
+        {
+          "name": "url",
+          "ordinal": 0,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      }
+    },
+    "query": "SELECT url FROM Posters WHERE id = $1"
   },
   "fba5d616fa44b1e53da2fd8e694707f51740ac54136fccfc874aa48a21b2fd7d": {
     "describe": {
