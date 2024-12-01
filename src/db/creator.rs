@@ -1,10 +1,12 @@
 use super::Imagefork;
+use crate::schema::creators::dsl::*;
 use chrono::NaiveDateTime;
-use rocket_db_pools::{sqlx, Connection};
+use rocket_db_pools::{diesel::prelude::*, Connection};
 use serde::{Deserialize, Serialize};
-use sqlx::Result;
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Queryable, Selectable, Deserialize, Serialize)]
+#[diesel(table_name = crate::schema::creators)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct Creator {
     pub id: i64,
     pub email: String,
@@ -15,15 +17,16 @@ pub struct Creator {
 }
 
 impl Creator {
-    pub async fn get(db: &mut Connection<Imagefork>, id: i64) -> Result<Option<Self>> {
-        sqlx::query_as!(
-            Self,
-            r#"SELECT id, email, creation_time, lockout, moderator, poster_limit
-            FROM Creators WHERE id = $1 LIMIT 1"#r,
-            id
-        )
-        .fetch_optional(&mut **db)
-        .await
+    pub async fn get(
+        db: &mut Connection<Imagefork>,
+        creator_id: i64,
+    ) -> crate::error::Result<Option<Self>> {
+        Ok(creators
+            .find(creator_id)
+            .select(Creator::as_select())
+            .first(db)
+            .await
+            .optional()?)
     }
 }
 
@@ -50,7 +53,7 @@ pub mod test {
     #[test]
     fn new_user_has_defaults() {
         let client = TestRocket::default().client();
-        client.get(uri!(delete_creator(email = "c1")));
+        client.get(uri!(delete_creator(email_addr = "c1")));
         let token: CreatorToken = client.get_json(uri!(login(email = "c1")));
 
         let creator: Option<Creator> = client.get_maybe_json(uri!(get_creator(id = token.id)));

@@ -49,7 +49,7 @@ impl CreatorToken {
     }
 
     pub fn remove_from_cookie_jar(cookie: &CookieJar) {
-        cookie.remove_private(Cookie::named(TOKEN_COOKIE_NAME));
+        cookie.remove_private(Cookie::from(TOKEN_COOKIE_NAME));
     }
 }
 
@@ -88,7 +88,7 @@ impl<'r> FromRequest<'r> for &'r CreatorToken {
             .await;
         user_ref
             .as_ref()
-            .into_outcome(crate::Error::NotLoggedIn.with_status())
+            .or_error(crate::Error::NotLoggedIn.with_status())
     }
 }
 
@@ -103,7 +103,7 @@ impl<'r> FromRequest<'r> for ModeratorToken<'r> {
         if creator.moderator {
             Outcome::Success(ModeratorToken(creator))
         } else {
-            Outcome::Failure(crate::Error::UserNotAdmin.with_status())
+            Outcome::Error(crate::Error::UserNotAdmin.with_status())
         }
     }
 }

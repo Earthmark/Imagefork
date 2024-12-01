@@ -21,7 +21,7 @@ async fn get_creator(
 
 #[get("/creator", format = "json", rank = 2)]
 fn get_creator_no_token() -> Unauthorized<()> {
-    Unauthorized(None)
+    Unauthorized(())
 }
 
 #[cfg(test)]

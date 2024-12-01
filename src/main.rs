@@ -9,8 +9,10 @@ mod image_meta;
 mod portal;
 mod redirect;
 mod error;
+mod schema;
 
 use config::bind;
+use dotenvy::dotenv;
 use rocket::{
     figment::{
         providers::{Format, Toml},
@@ -37,7 +39,6 @@ fn common_server(figment: Figment) -> Rocket<Build> {
         .unwrap();
     Rocket::custom(figment)
         .attach(db::Imagefork::init())
-        .attach(db::Imagefork::init_migrations())
         .attach(prometheus.clone())
         .mount("/metrics", prometheus)
 }
@@ -61,6 +62,7 @@ fn portal_server(base: Rocket<Build>) -> Rocket<Build> {
 
 #[launch]
 pub fn rocket() -> Rocket<Build> {
+    dotenv().ok();
     let figment = config();
     if let Ok(kind) = figment.extract_inner::<String>("server_kind") {
         match kind.as_ref() {

@@ -83,7 +83,7 @@ impl<'r, 'o: 'r> Responder<'r, 'o> for Error {
 #[derive(Error, Debug)]
 pub enum InternalError {
     #[error("Sql: {0}")]
-    Sqlx(#[from] sqlx::Error),
+    Diesel(#[from] rocket_db_pools::diesel::result::Error),
     #[error("Rocket: {0}")]
     Rocket(#[from] rocket::Error),
     #[error("Reqwest: {0}")]

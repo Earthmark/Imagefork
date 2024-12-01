@@ -1,10 +1,15 @@
 use super::Imagefork;
+use crate::schema::posters::dsl::*;
 use chrono::NaiveDateTime;
-use rocket_db_pools::{sqlx, Connection};
+use rocket_db_pools::{
+    diesel::{prelude::*, RunQueryDsl},
+    Connection,
+};
 use serde::{Deserialize, Serialize};
-use sqlx::Result;
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Queryable, Selectable, Deserialize, Serialize, Debug)]
+#[diesel(table_name = crate::schema::posters)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct Poster {
     id: i64,
     creator: i64,
@@ -12,118 +17,112 @@ pub struct Poster {
     url: String,
     stopped: bool,
     lockout: bool,
-    serveable: bool,
+    servable: bool,
 }
+
+#[derive(Insertable)]
+#[diesel(table_name = crate::schema::posters)]
+struct NewPoster<'a> {
+    creator: i64,
+    url: &'a str,
+}
+
+sql_function!(fn random() -> Text);
 
 impl Poster {
     pub async fn get(
         db: &mut Connection<Imagefork>,
         creator_id: i64,
         poster_id: i64,
-    ) -> Result<Option<Self>> {
-        sqlx::query_as!(
-            Self,
-            "SELECT * FROM Posters WHERE id = $1 AND creator = $2 LIMIT 1",
-            poster_id,
-            creator_id
-        )
-        .fetch_optional(&mut **db)
-        .await
+    ) -> crate::error::Result<Option<Self>> {
+        Ok(posters
+            .filter(id.eq(poster_id).and(creator.eq(creator_id)))
+            .select(Self::as_select())
+            .first(db)
+            .await
+            .optional()?)
     }
 
     pub async fn get_all_by_creator(
         db: &mut Connection<Imagefork>,
         creator_id: i64,
-    ) -> Result<Vec<Self>> {
-        sqlx::query_as!(
-            Self,
-            "SELECT * FROM Posters WHERE creator = $1 ORDER BY id",
-            creator_id
-        )
-        .fetch_all(&mut **db)
-        .await
+    ) -> crate::error::Result<Vec<Self>> {
+        Ok(posters
+            .filter(creator.eq(creator_id))
+            .order_by(id.desc())
+            .select(Poster::as_select())
+            .load(db)
+            .await?)
     }
 
     pub async fn create(
         db: &mut Connection<Imagefork>,
         creator_id: i64,
-        url: &str,
-    ) -> Result<Option<Self>> {
-        sqlx::query_as!(
-            Self,
-            "INSERT INTO Posters (Creator, Url)
-            SELECT $1, $2
-            RETURNING *;
-            ",
-            creator_id,
-            url,
-        )
-        .fetch_optional(&mut **db)
-        .await
+        poster_url: &str,
+    ) -> crate::error::Result<Option<Self>> {
+        Ok(diesel::insert_into(posters)
+            .values(NewPoster {
+                creator: creator_id,
+                url: poster_url,
+            })
+            .returning(Self::as_returning())
+            .get_result(db)
+            .await
+            .optional()?)
     }
 
     pub async fn update(
         db: &mut Connection<Imagefork>,
         creator_id: i64,
         poster_id: i64,
-        stopped: bool,
-    ) -> Result<Option<Self>> {
-        sqlx::query_as!(
-            Self,
-            "UPDATE Posters
-            SET stopped = $3
-            WHERE id = $1 AND creator = $2
-            RETURNING *;
-            ",
-            poster_id,
-            creator_id,
-            stopped,
+        is_stopped: bool,
+    ) -> crate::error::Result<Option<Self>> {
+        Ok(
+            diesel::update(posters.find(poster_id).filter(creator.eq(creator_id)))
+                .set(stopped.eq(is_stopped))
+                .returning(Self::as_returning())
+                .get_result(db)
+                .await
+                .optional()?,
         )
-        .fetch_optional(&mut **db)
-        .await
     }
 
     pub async fn delete(
         db: &mut Connection<Imagefork>,
         creator_id: i64,
         poster_id: i64,
-    ) -> Result<Option<Self>> {
-        sqlx::query_as!(
-            Self,
-            "DELETE FROM Posters
-            WHERE id = $1 AND creator = $2
-            RETURNING *;
-            ",
-            poster_id,
-            creator_id,
-        )
-        .fetch_optional(&mut **db)
-        .await
-    }
-
-    pub async fn get_id_of_approx(db: &mut Connection<Imagefork>) -> Result<Option<i64>> {
-        struct FoundPoster {
-            id: i64,
-        }
-        Ok(sqlx::query_as!(
-            FoundPoster,
-            "SELECT id FROM Posters WHERE serveable ORDER BY RANDOM() LIMIT 1"
-        )
-        .fetch_optional(&mut **db)
-        .await?
-        .map(|f| f.id))
-    }
-
-    pub async fn get_url(db: &mut Connection<Imagefork>, id: i64) -> Result<Option<String>> {
-        struct PosterUrl {
-            url: String,
-        }
+    ) -> crate::error::Result<Option<Self>> {
         Ok(
-            sqlx::query_as!(PosterUrl, "SELECT url FROM Posters WHERE id = $1", id)
-                .fetch_optional(&mut **db)
-                .await?
-                .map(|f| f.url),
+            diesel::delete(posters.find(poster_id).filter(creator.eq(creator_id)))
+                .returning(Self::as_returning())
+                .get_result(db)
+                .await
+                .optional()?,
         )
+    }
+
+    pub async fn get_id_of_approx(
+        db: &mut Connection<Imagefork>,
+    ) -> crate::error::Result<Option<i64>> {
+        Ok(posters
+            .select(id)
+            .filter(servable)
+            .order_by(random())
+            .first(db)
+            .await
+            .optional()?)
+    }
+
+    pub async fn get_url(
+        db: &mut Connection<Imagefork>,
+        poster_id: i64,
+    ) -> crate::error::Result<Option<String>> {
+        Ok(posters
+            .find(poster_id)
+            .select(url)
+            .get_result(db)
+            .await
+            .optional()?)
     }
 }
 
