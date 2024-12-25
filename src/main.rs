@@ -1,80 +1,137 @@
-#[macro_use]
-extern crate rocket;
-
 mod cache;
-mod config;
 mod db;
-mod image;
-mod image_meta;
-mod portal;
-mod redirect;
 mod error;
+mod image;
+//mod image_meta;
+//mod portal;
+mod either_resp;
+mod prelude;
+mod redirect;
 mod schema;
+mod service;
 
-use config::bind;
-use dotenvy::dotenv;
-use rocket::{
-    figment::{
-        providers::{Format, Toml},
-        Figment,
-    },
-    Build, Config, Rocket,
-};
-use rocket_db_pools::Database;
-use rocket_oauth2::OAuth2;
-use rocket_prometheus::PrometheusMetrics;
-use thiserror::Error;
+use axum::{routing::get, Router};
+use axum_prometheus::PrometheusMetricLayer;
+use figment::providers::Format;
+use redirect::RedirectOptions;
+use serde::Deserialize;
 
 pub use error::*;
+use service::{run_with_ctl_c, Service};
+use tracing::{info, error};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-pub fn config() -> Figment {
-    Config::figment().join(Toml::file("Secrets.toml").nested())
+fn config() -> AppOptions {
+    figment::Figment::new()
+        .join(figment::providers::Env::prefixed("APP_"))
+        .join(figment::providers::Toml::file("imagefork.toml"))
+        .extract()
+        .unwrap()
 }
 
-fn common_server(figment: Figment) -> Rocket<Build> {
-    let prometheus = PrometheusMetrics::new();
-    prometheus
-        .registry()
-        .register(Box::new(cache::CACHE_RESOLUTION.clone()))
-        .unwrap();
-    Rocket::custom(figment)
-        .attach(db::Imagefork::init())
-        .attach(prometheus.clone())
-        .mount("/metrics", prometheus)
+fn init_tracing() {
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                format!("{}=debug,tower_http=debug", env!("CARGO_CRATE_NAME")).into()
+            }),
+        )
+        .with(tracing_subscriber::fmt::layer())
+        .init();
 }
 
-fn redirect_server(base: Rocket<Build>) -> Rocket<Build> {
-    base.attach(cache::Cache::init())
-        .attach(bind::<cache::TokenCacheConfig>())
-        .mount("/redirect", redirect::routes())
-}
+async fn run_app(opts: &AppOptions) -> Result<()> {
+    let (monitoring_layer, monitoring_router) = {
+        let (mut prometheus_layer, metric_handle) = PrometheusMetricLayer::pair();
+        prometheus_layer.enable_response_body_size();
+        let router = Router::new()
+            .route(
+                "/metrics",
+                get(move || std::future::ready(metric_handle.render())),
+            )
+            .layer(prometheus_layer.clone());
 
-fn portal_server(base: Rocket<Build>) -> Rocket<Build> {
-    base.manage(image_meta::WebImageMetadataAggregator::default())
-        .manage(portal::auth::AuthClient::default())
-        .attach(OAuth2::<portal::auth::github::GitHub>::fairing("github"))
-        .mount("/", portal::auth::github::routes())
-        .attach(bind::<portal::token::TokenConfig>())
-        .attach(portal::ui::template_fairing())
-        .mount("/", portal::ui::static_files())
-        .mount("/", portal::routes())
-}
+        (prometheus_layer, router)
+    };
 
-#[launch]
-pub fn rocket() -> Rocket<Build> {
-    dotenv().ok();
-    let figment = config();
-    if let Ok(kind) = figment.extract_inner::<String>("server_kind") {
-        match kind.as_ref() {
-            "redirect" => redirect_server(common_server(figment)),
-            "portal" => portal_server(common_server(figment)),
-            _ => panic!("Unknown server kind"),
+    let app_router: Result<Router> = {
+        let db = db::DbPool::builder()
+            .build(db::DbManager::new(opts.core_pg_url.as_str()))
+            .await?;
+
+        let mut included_services = Vec::new();
+
+        let mut router = Router::new();
+        if let Some(opts) = &opts.redirect {
+            included_services.push("redirect");
+            let tokens = cache::CoherencyTokenPool::builder()
+                .build(cache::CoherencyTokenManager::new(
+                    opts.coherency_token_redis_url.as_str(),
+                )?)
+                .await?;
+
+            router = router.nest(
+                "/redirect",
+                redirect::create_router(db, tokens, opts.coherency_token_keepalive_minutes * 60),
+            );
         }
-    } else {
-        portal_server(redirect_server(common_server(figment)))
-    }
+
+        if let Some(_opts) = &opts.portal {
+            included_services.push("portal");
+            // router = router.merge()
+        }
+
+        if included_services.is_empty() {
+            error!("No services were selected to be run in the app binding.");
+            return Err(Error::InternalError(InternalError::SystemError(
+                "No services were selected to be run in the app binding".into(),
+            )));
+        }
+
+        info!("Included services: {}", included_services.join(", "));
+
+        Ok(router.layer(monitoring_layer))
+    };
+
+    run_with_ctl_c(
+        [
+            Service::new("app", opts.app_addr.clone(), app_router?),
+            Service::new(
+                "monitoring",
+                opts.monitoring_addr.clone(),
+                monitoring_router,
+            ),
+        ]
+        .into_iter(),
+    )
+    .await?;
+
+    Ok(())
 }
 
+#[derive(Deserialize, Clone)]
+struct AppOptions {
+    app_addr: String,
+    monitoring_addr: String,
+    core_pg_url: String,
+    redirect: Option<RedirectOptions>,
+    portal: Option<PortalOptions>,
+}
+
+#[derive(Deserialize, Clone)]
+struct PortalOptions {}
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    init_tracing();
+    let config = config();
+
+    run_app(&config).await?;
+
+    Ok(())
+}
+
+/*
 #[cfg(test)]
 mod test {
     use std::fmt::Display;
@@ -153,3 +210,4 @@ mod test {
         TestRocket::default().client();
     }
 }
+*/

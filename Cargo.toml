@@ -4,26 +4,29 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-rocket = { version = "*", features = ["json", "secrets", "uuid"] }
-rocket_prometheus = "*"
-rocket_db_pools = { version = "*", features = [
-  "diesel_postgres",
-  "deadpool_redis",
-] }
-thiserror = "*"
+askama = { version = "*", features = ["with-axum"] }
+axum = { version = "*", features = ["tower-log", "macros"] }
+axum-prometheus = "*"
+base64 = "*"
+bb8 = "*"
+bb8-redis = "*"
+chrono = { version = "*", features = ["serde"] }
+diesel = { version = "*", features = ["postgres", "chrono"] }
+diesel-async = { version = "*", features = ["postgres", "bb8"] }
+figment = { version = "*", features = ["env", "toml"] }
+image = { version = "*", features = ["libwebp", "rgb"] }
+lazy_static = "*"
+mediatype = { version = "*", features = ["serde"] }
+metrics = "*"
+metrics-exporter-prometheus = "*"
+rand = "*"
+reqwest = { version = "*", features = ["tokio-rustls", "json"] }
+rust-embed = "*"
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
-rust-embed = "*"
-chrono = { version = "*", features = ["serde"] }
-reqwest = { version = "*", features = ["tokio-rustls", "json"] }
-image = { version = "*", features = ["libwebp", "rgb"] }
 sha2 = "*"
-rocket_dyn_templates = { version = "*", features = ["handlebars"] }
-rand = "*"
-base64 = "*"
+thiserror = "*"
+tokio = { version = "*", features = ["full"] }
+tracing = "*"
+tracing-subscriber = { version = "*", features = ["env-filter"] }
 uuid = { version = "*", features = ["serde"] }
-lazy_static = "*"
-diesel = { version = "*", features = ["postgres", "chrono"] }
-diesel-async = "*"
-dotenvy = "*"
-rocket_oauth2 = "0.5.0"

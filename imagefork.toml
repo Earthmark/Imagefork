@@ -1,0 +1,7 @@
+app_addr="localhost:8080"
+monitoring_addr="localhost:8081"
+core_pg_url="postgres://postgres:testpgpass@localhost/postgres"
+
+[redirect]
+coherency_token_redis_url="redis://localhost:6379"
+coherency_token_keepalive_minutes=20

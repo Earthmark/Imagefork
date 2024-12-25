@@ -5,8 +5,6 @@ diesel::table! {
         id -> Int8,
         creation_time -> Timestamp,
         email -> Text,
-        token -> Text,
-        minting_time -> Timestamp,
         lockout -> Bool,
         moderator -> Bool,
         poster_limit -> Int4,

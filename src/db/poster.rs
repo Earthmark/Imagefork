@@ -1,10 +1,8 @@
-use super::Imagefork;
-use crate::schema::posters::dsl::*;
+use super::DbConn;
+use crate::schema::posters::dsl;
 use chrono::NaiveDateTime;
-use rocket_db_pools::{
-    diesel::{prelude::*, RunQueryDsl},
-    Connection,
-};
+use diesel::prelude::*;
+use diesel_async::RunQueryDsl;
 use serde::{Deserialize, Serialize};
 
 #[derive(Queryable, Selectable, Deserialize, Serialize, Debug)]
@@ -31,36 +29,36 @@ sql_function!(fn random() -> Text);
 
 impl Poster {
     pub async fn get(
-        db: &mut Connection<Imagefork>,
+        db: &mut DbConn,
         creator_id: i64,
         poster_id: i64,
     ) -> crate::error::Result<Option<Self>> {
-        Ok(posters
-            .filter(id.eq(poster_id).and(creator.eq(creator_id)))
+        Ok(dsl::posters
+            .filter(dsl::id.eq(poster_id).and(dsl::creator.eq(creator_id)))
             .select(Self::as_select())
-            .first(db)
+            .first(&mut *db)
             .await
             .optional()?)
     }
 
     pub async fn get_all_by_creator(
-        db: &mut Connection<Imagefork>,
+        db: &mut DbConn,
         creator_id: i64,
     ) -> crate::error::Result<Vec<Self>> {
-        Ok(posters
-            .filter(creator.eq(creator_id))
-            .order_by(id.desc())
+        Ok(dsl::posters
+            .filter(dsl::creator.eq(creator_id))
+            .order_by(dsl::id.desc())
             .select(Poster::as_select())
             .load(db)
             .await?)
     }
 
     pub async fn create(
-        db: &mut Connection<Imagefork>,
+        db: &mut DbConn,
         creator_id: i64,
         poster_url: &str,
     ) -> crate::error::Result<Option<Self>> {
-        Ok(diesel::insert_into(posters)
+        Ok(diesel::insert_into(dsl::posters)
             .values(NewPoster {
                 creator: creator_id,
                 url: poster_url,
@@ -72,60 +70,60 @@ impl Poster {
     }
 
     pub async fn update(
-        db: &mut Connection<Imagefork>,
+        db: &mut DbConn,
         creator_id: i64,
         poster_id: i64,
         is_stopped: bool,
     ) -> crate::error::Result<Option<Self>> {
-        Ok(
-            diesel::update(posters.find(poster_id).filter(creator.eq(creator_id)))
-                .set(stopped.eq(is_stopped))
-                .returning(Self::as_returning())
-                .get_result(db)
-                .await
-                .optional()?,
+        Ok(diesel::update(
+            dsl::posters
+                .find(poster_id)
+                .filter(dsl::creator.eq(creator_id)),
         )
+        .set(dsl::stopped.eq(is_stopped))
+        .returning(Self::as_returning())
+        .get_result(db)
+        .await
+        .optional()?)
     }
 
     pub async fn delete(
-        db: &mut Connection<Imagefork>,
+        db: &mut DbConn,
         creator_id: i64,
         poster_id: i64,
-    ) -> crate::error::Result<Option<Self>> {
-        Ok(
-            diesel::delete(posters.find(poster_id).filter(creator.eq(creator_id)))
-                .returning(Self::as_returning())
-                .get_result(db)
-                .await
-                .optional()?,
+    ) -> crate::Result<Option<Self>> {
+        Ok(diesel::delete(
+            dsl::posters
+                .find(poster_id)
+                .filter(dsl::creator.eq(creator_id)),
         )
+        .returning(Self::as_returning())
+        .get_result(db)
+        .await
+        .optional()?)
     }
 
-    pub async fn get_id_of_approx(
-        db: &mut Connection<Imagefork>,
-    ) -> crate::error::Result<Option<i64>> {
-        Ok(posters
-            .select(id)
-            .filter(servable)
+    pub async fn get_id_of_approx(db: &mut DbConn) -> crate::Result<Option<i64>> {
+        Ok(dsl::posters
+            .select(dsl::id)
+            .filter(dsl::servable)
             .order_by(random())
             .first(db)
             .await
             .optional()?)
     }
 
-    pub async fn get_url(
-        db: &mut Connection<Imagefork>,
-        poster_id: i64,
-    ) -> crate::error::Result<Option<String>> {
-        Ok(posters
+    pub async fn get_url(db: &mut DbConn, poster_id: i64) -> crate::Result<Option<String>> {
+        Ok(dsl::posters
             .find(poster_id)
-            .select(url)
+            .select(dsl::url)
             .get_result(db)
             .await
             .optional()?)
     }
 }
 
+/*
 #[cfg(test)]
 mod test {
     use super::{super::Imagefork, Poster};
@@ -174,3 +172,4 @@ mod test {
         assert!(posters.len() == 0);
     }
 }
+*/

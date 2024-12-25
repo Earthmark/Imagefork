@@ -1,25 +1,18 @@
-use rocket::{
-    http::{ContentType, MediaType, Status},
-    response::Responder,
-    Response,
-};
+use axum::{http::header, response::IntoResponse};
+use mediatype::MediaType;
 
 #[derive(Clone)]
-pub struct Image {
-    format: MediaType,
+pub struct StaticImage {
+    format: &'static MediaType<'static>,
     data: &'static [u8],
 }
 
-impl Image {
-    pub const fn new(format: MediaType, data: &'static [u8]) -> Self {
+impl StaticImage {
+    pub const fn new(format: &'static MediaType, data: &'static [u8]) -> Self {
         Self { format, data }
     }
-}
 
-impl<'r, 'o: 'r> Responder<'r, 'o> for Image {
-    fn respond_to(self, request: &'r rocket::Request<'_>) -> rocket::response::Result<'o> {
-        Response::build_from((Status::Ok, self.data).respond_to(request)?)
-            .header(ContentType(self.format))
-            .ok()
+    pub fn to_response(&self) -> impl IntoResponse {
+        ([(header::CONTENT_TYPE, self.format.to_string())], self.data)
     }
 }

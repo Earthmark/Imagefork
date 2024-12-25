@@ -1,4 +1,3 @@
-use rocket::error;
 use sha2::{Digest, Sha256};
 use std::{fmt::Write, time::Duration};
 use thiserror::Error;

@@ -1,39 +1,18 @@
-use crate::config::ConfigInfo;
-use deadpool_redis::redis::cmd;
-use lazy_static::lazy_static;
-use rocket_db_pools::{deadpool_redis, Connection, Database};
-use rocket_prometheus::prometheus::{register_int_counter_vec, IntCounterVec};
-use serde::Deserialize;
+use axum::{
+    extract::{FromRef, FromRequestParts},
+    http::request::Parts,
+};
+use bb8_redis::{redis::cmd, RedisConnectionManager};
+use metrics::counter;
 use sha2::{digest::Output, Digest, Sha256};
 use std::future::Future;
 
-lazy_static! {
-    pub static ref CACHE_RESOLUTION: IntCounterVec = register_int_counter_vec!(
-        "redirect_cache_status",
-        "Cache hit status from the redirect cache.",
-        &["hit_status"]
-    )
-    .unwrap();
-}
+use crate::Error;
 
-#[derive(Database)]
-#[database("tokens")]
-pub struct Cache(deadpool_redis::Pool);
+pub type CoherencyTokenManager = RedisConnectionManager;
+pub type CoherencyTokenPool = bb8::Pool<CoherencyTokenManager>;
 
-#[derive(Deserialize)]
-pub struct TokenCacheConfig {
-    pub token_keepalive_minutes: i32,
-}
-
-impl ConfigInfo for TokenCacheConfig {
-    fn field() -> &'static str {
-        "tokens"
-    }
-
-    fn name() -> &'static str {
-        "Config for tokens redis db"
-    }
-}
+pub struct CoherencyTokenConn(bb8::PooledConnection<'static, CoherencyTokenManager>);
 
 fn hash_token(token: &str) -> Output<Sha256> {
     let mut hasher = Sha256::new();
@@ -41,46 +20,67 @@ fn hash_token(token: &str) -> Output<Sha256> {
     hasher.finalize()
 }
 
-impl Cache {
+#[axum::async_trait]
+impl<S> FromRequestParts<S> for CoherencyTokenConn
+where
+    S: Send + Sync,
+    CoherencyTokenPool: FromRef<S>,
+{
+    type Rejection = Error;
+
+    async fn from_request_parts(_parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let pool = CoherencyTokenPool::from_ref(state);
+
+        let conn = pool.get_owned().await?;
+
+        Ok(Self(conn))
+    }
+}
+
+impl CoherencyTokenConn {
     pub async fn get_or_create(
-        db: &mut Connection<Self>,
+        &mut self,
         token: &str,
-        token_keepalive_seconds: i32,
-        init: impl Future<Output = i64>,
-    ) -> Result<i64, crate::Error> {
+        token_keepalive_seconds: u32,
+        init: impl Future<Output = crate::Result<Option<i64>>>,
+    ) -> crate::Result<Option<i64>> {
         let hash = hash_token(token);
 
         if let Some(target) = cmd("GETEX")
             .arg(hash.as_slice())
             .arg("EX")
             .arg(token_keepalive_seconds)
-            .query_async(&mut **db)
+            .query_async(&mut *self.0)
             .await?
         {
-            CACHE_RESOLUTION.with_label_values(&["hit"]);
+            counter!("/coherency_token/hit").increment(1);
             Ok(target)
         } else {
-            let target = init.await;
-            let try_set: Option<i64> = cmd("SET")
-                .arg(hash.as_slice())
-                .arg(target)
-                .arg("NX")
-                .arg("GET")
-                .arg("EX")
-                .arg(token_keepalive_seconds)
-                .query_async(&mut **db)
-                .await?;
-            if let Some(target) = try_set {
-                CACHE_RESOLUTION.with_label_values(&["discard_update"]);
-                Ok(target)
+            if let Some(target) = init.await? {
+                let try_set: Option<i64> = cmd("SET")
+                    .arg(hash.as_slice())
+                    .arg(target)
+                    .arg("NX")
+                    .arg("GET")
+                    .arg("EX")
+                    .arg(token_keepalive_seconds)
+                    .query_async(&mut *self.0)
+                    .await?;
+                if let Some(target) = try_set {
+                    counter!("/coherency_token/update_discarded").increment(1);
+                    Ok(Some(target))
+                } else {
+                    counter!("/coherency_token/update").increment(1);
+                    Ok(Some(target))
+                }
             } else {
-                CACHE_RESOLUTION.with_label_values(&["update"]);
-                Ok(target)
+                Ok(None)
             }
         }
     }
 }
 
+/*
 #[cfg(test)]
 mod test {
     use std::time::Duration;
@@ -157,3 +157,4 @@ mod test {
         client.get(uri!(force_delete(token = "D")));
     }
 }
+*/

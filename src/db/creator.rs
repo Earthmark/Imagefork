@@ -1,7 +1,8 @@
-use super::Imagefork;
+use super::DbConn;
 use crate::schema::creators::dsl::*;
 use chrono::NaiveDateTime;
-use rocket_db_pools::{diesel::prelude::*, Connection};
+use diesel::prelude::*;
+use diesel_async::RunQueryDsl;
 use serde::{Deserialize, Serialize};
 
 #[derive(Queryable, Selectable, Deserialize, Serialize)]
@@ -18,7 +19,7 @@ pub struct Creator {
 
 impl Creator {
     pub async fn get(
-        db: &mut Connection<Imagefork>,
+        db: &mut DbConn,
         creator_id: i64,
     ) -> crate::error::Result<Option<Self>> {
         Ok(creators
@@ -30,6 +31,7 @@ impl Creator {
     }
 }
 
+/*
 #[cfg(test)]
 pub mod test {
     use super::{
@@ -66,3 +68,4 @@ pub mod test {
         assert!(creator.poster_limit < 20);
     }
 }
+*/

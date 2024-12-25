@@ -1,0 +1,15 @@
+services:
+  token-store:
+    image: redis
+    ports:
+      - "6379:6379"
+  db:
+    image: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: testpgpass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+volumes:
+  postgres_data:

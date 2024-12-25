@@ -6,6 +6,9 @@ pub mod posters;
 pub mod token;
 pub mod ui;
 
+#[derive(FromRef)]
+struct PortalState(Arc<DbPool>, AppConfig);
+
 pub fn routes() -> Vec<Route> {
     let mut routes = Vec::default();
     routes.append(&mut auth::routes());
