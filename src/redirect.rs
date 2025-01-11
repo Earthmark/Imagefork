@@ -6,6 +6,7 @@ use crate::{
 };
 use axum::{
     extract::{FromRef, Path, State},
+    http::StatusCode,
     response::{IntoResponse, Redirect},
     routing::get,
     Router,
@@ -89,10 +90,10 @@ async fn handler(
 ) -> EitherResp<Redirect, impl IntoResponse> {
     match handle_redirect_internal(db, cache, config, Some(&token)).await {
         Ok(Some(url)) => EitherResp::A(Redirect::temporary(&url)),
-        Ok(None) => EitherResp::B(SAFE_IMAGE.to_response()),
+        Ok(None) => EitherResp::B((StatusCode::NOT_FOUND, SAFE_IMAGE.to_response())),
         Err(e) => {
             tracing::warn!("Error resolving redirect {}", e);
-            EitherResp::B(ERROR_IMAGE.to_response())
+            EitherResp::B((StatusCode::INTERNAL_SERVER_ERROR, ERROR_IMAGE.to_response()))
         }
     }
 }

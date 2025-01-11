@@ -2,9 +2,10 @@ use axum::{
     extract::{FromRef, FromRequestParts},
     http::request::Parts,
 };
+use base64::Engine;
 use bb8_redis::{redis::cmd, RedisConnectionManager};
 use metrics::counter;
-use sha2::{digest::Output, Digest, Sha256};
+use sha2::{Digest, Sha256};
 use std::future::Future;
 
 use crate::Error;
@@ -14,10 +15,11 @@ pub type CoherencyTokenPool = bb8::Pool<CoherencyTokenManager>;
 
 pub struct CoherencyTokenConn(bb8::PooledConnection<'static, CoherencyTokenManager>);
 
-fn hash_token(token: &str) -> Output<Sha256> {
+fn hash_token(token: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(token);
-    hasher.finalize()
+    let output = hasher.finalize();
+    base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(output)
 }
 
 impl<S> FromRequestParts<S> for CoherencyTokenConn
@@ -41,38 +43,41 @@ impl CoherencyTokenConn {
         &mut self,
         token: &str,
         token_keepalive_seconds: u32,
-        init: impl Future<Output = crate::Result<Option<i64>>>,
+        get_poster: impl Future<Output = crate::Result<Option<i64>>>,
     ) -> crate::Result<Option<i64>> {
-        let hash = hash_token(token);
+        fn result_counter(noun: &'static str) {
+            counter!("imagefork_redirect_coherency_token", "action" => noun).increment(1);
+        }
+
+        let hash = &hash_token(token);
 
         if let Some(target) = cmd("GETEX")
-            .arg(hash.as_slice())
+            .arg(hash)
             .arg("EX")
             .arg(token_keepalive_seconds)
             .query_async(&mut *self.0)
             .await?
         {
-            counter!("/coherency_token/hit").increment(1);
+            result_counter("hit");
             Ok(target)
         } else {
-            if let Some(target) = init.await? {
+            if let Some(target) = get_poster.await? {
                 let try_set: Option<i64> = cmd("SET")
-                    .arg(hash.as_slice())
+                    .arg(hash)
                     .arg(target)
-                    .arg("NX")
-                    .arg("GET")
-                    .arg("EX")
+                    .arg(&["NX", "GET", "EX"])
                     .arg(token_keepalive_seconds)
                     .query_async(&mut *self.0)
                     .await?;
-                if let Some(target) = try_set {
-                    counter!("/coherency_token/update_discarded").increment(1);
-                    Ok(Some(target))
+                if let Some(already_found_target) = try_set {
+                    result_counter("update_discarded");
+                    Ok(Some(already_found_target))
                 } else {
-                    counter!("/coherency_token/update").increment(1);
+                    result_counter("update");
                     Ok(Some(target))
                 }
             } else {
+                result_counter("none_found");
                 Ok(None)
             }
         }
