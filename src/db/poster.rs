@@ -25,7 +25,7 @@ struct NewPoster<'a> {
     url: &'a str,
 }
 
-sql_function!(fn random() -> Text);
+define_sql_function!(fn random() -> Text);
 
 impl Poster {
     pub async fn get(

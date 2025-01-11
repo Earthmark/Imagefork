@@ -20,7 +20,6 @@ fn hash_token(token: &str) -> Output<Sha256> {
     hasher.finalize()
 }
 
-#[axum::async_trait]
 impl<S> FromRequestParts<S> for CoherencyTokenConn
 where
     S: Send + Sync,

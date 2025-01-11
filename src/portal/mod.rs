@@ -7,7 +7,7 @@ pub mod token;
 pub mod ui;
 
 #[derive(FromRef)]
-struct PortalState(Arc<DbPool>, AppConfig);
+struct PortalState(DbPool, AppConfig);
 
 pub fn routes() -> Vec<Route> {
     let mut routes = Vec::default();

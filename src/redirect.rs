@@ -37,7 +37,7 @@ pub fn create_router(
     redirect_token_keepalive_seconds: u32,
 ) -> Router {
     Router::new()
-        .route("/:token", get(handler))
+        .route("/{token}", get(handler))
         .with_state(RedirectState {
             db,
             tokens,

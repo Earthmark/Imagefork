@@ -8,18 +8,23 @@ use axum::{
     extract::{FromRef, FromRequestParts},
     http::request::Parts,
 };
-use diesel_async::{pooled_connection::AsyncDieselConnectionManager, AsyncPgConnection};
+use diesel_async::{
+    pooled_connection::{
+        bb8::{Pool, PooledConnection},
+        AsyncDieselConnectionManager,
+    },
+    AsyncPgConnection,
+};
 
 pub use poster::Poster;
 
 use crate::Error;
 
 pub type DbManager = AsyncDieselConnectionManager<AsyncPgConnection>;
-pub type DbPool = bb8::Pool<DbManager>;
+pub type DbPool = Pool<AsyncPgConnection>;
 
-pub struct DbConn(bb8::PooledConnection<'static, DbManager>);
+pub struct DbConn(PooledConnection<'static, AsyncPgConnection>);
 
-#[axum::async_trait]
 impl<S> FromRequestParts<S> for DbConn
 where
     S: Send + Sync,
@@ -37,7 +42,7 @@ where
 }
 
 impl Deref for DbConn {
-    type Target = bb8::PooledConnection<'static, AsyncDieselConnectionManager<AsyncPgConnection>>;
+    type Target = PooledConnection<'static, AsyncPgConnection>;
 
     fn deref(&self) -> &Self::Target {
         &self.0

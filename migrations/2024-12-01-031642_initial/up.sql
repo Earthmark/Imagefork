@@ -21,3 +21,10 @@ CREATE TABLE Posters (
     )
   ) STORED
 );
+
+CREATE TABLE LoginTokens (
+  id BIGSERIAL PRIMARY KEY,
+  creator BIGSERIAL NOT NULL REFERENCES Creators (id) ON DELETE CASCADE,
+);
+
+

@@ -77,7 +77,7 @@ pub enum InternalError {
     #[error("Sql-Init: {0}")]
     DieselInit(#[from] diesel_async::pooled_connection::PoolError),
     #[error("Sql-Pool: {0}")]
-    DieselPool(#[from] bb8::RunError<diesel_async::pooled_connection::PoolError>),
+    DieselPool(#[from] diesel_async::pooled_connection::bb8::RunError),
     #[error("Redis: {0}")]
     Redis(#[from] bb8_redis::redis::RedisError),
     #[error("Redis-Pool: {0}")]

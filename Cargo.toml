@@ -9,9 +9,10 @@ axum = { version = "*", features = ["tower-log", "macros"] }
 axum-prometheus = "*"
 base64 = "*"
 bb8 = "*"
+bb8-diesel = "*"
 bb8-redis = "*"
 chrono = { version = "*", features = ["serde"] }
-diesel = { version = "*", features = ["postgres", "chrono"] }
+diesel = { version = "*", features = ["chrono"] }
 diesel-async = { version = "*", features = ["postgres", "bb8"] }
 figment = { version = "*", features = ["env", "toml"] }
 image = { version = "*", features = ["libwebp", "rgb"] }
@@ -19,6 +20,7 @@ lazy_static = "*"
 mediatype = { version = "*", features = ["serde"] }
 metrics = "*"
 metrics-exporter-prometheus = "*"
+oauth2 = "*"
 rand = "*"
 reqwest = { version = "*", features = ["tokio-rustls", "json"] }
 rust-embed = "*"
