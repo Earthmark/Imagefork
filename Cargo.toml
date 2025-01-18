@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 askama = { version = "*", features = ["with-axum"] }
 axum = { version = "*", features = ["tower-log", "macros"] }
+axum-extra = { version = "*", features = ["typed-header"] }
 axum-prometheus = "*"
 base64 = "*"
 bb8 = "*"
@@ -22,7 +23,10 @@ metrics = "*"
 metrics-exporter-prometheus = "*"
 oauth2 = "*"
 rand = "*"
-reqwest = { version = "*", features = ["tokio-rustls", "json"] }
+reqwest = { version = "*", features = ["json"] }
+reqwest-middleware = { version = "*", features = ["json"] }
+reqwest-retry = { version = "*", features = ["tracing"] }
+reqwest-tracing = "*"
 rust-embed = "*"
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"

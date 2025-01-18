@@ -1,6 +1,9 @@
 pub mod creator;
+pub mod creator_session;
 pub mod creator_token;
+pub mod crsf_session;
 pub mod poster;
+mod util;
 
 use std::ops::{Deref, DerefMut};
 
@@ -20,10 +23,14 @@ pub use poster::Poster;
 
 use crate::Error;
 
-pub type DbManager = AsyncDieselConnectionManager<AsyncPgConnection>;
+type DbManager = AsyncDieselConnectionManager<AsyncPgConnection>;
 pub type DbPool = Pool<AsyncPgConnection>;
 
 pub struct DbConn(PooledConnection<'static, AsyncPgConnection>);
+
+pub async fn build_pool(url: &str) -> crate::Result<DbPool> {
+    Ok(DbPool::builder().build(DbManager::new(url)).await?)
+}
 
 impl<S> FromRequestParts<S> for DbConn
 where

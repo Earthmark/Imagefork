@@ -1,5 +1,5 @@
 use super::DbConn;
-use crate::schema::creators::dsl::*;
+use crate::schema::creators::dsl;
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
@@ -18,16 +18,33 @@ pub struct Creator {
 }
 
 impl Creator {
-    pub async fn get(
-        db: &mut DbConn,
-        creator_id: i64,
-    ) -> crate::error::Result<Option<Self>> {
-        Ok(creators
+    pub async fn get(db: &mut DbConn, creator_id: i64) -> crate::error::Result<Option<Self>> {
+        Ok(dsl::creators
             .find(creator_id)
             .select(Creator::as_select())
             .first(db)
             .await
             .optional()?)
+    }
+
+    pub async fn get_by_email(db: &mut DbConn, email: &str) -> crate::error::Result<Option<Self>> {
+        Ok(dsl::creators
+            .filter(dsl::email.eq(email))
+            .select(Creator::as_select())
+            .first(db)
+            .await
+            .optional()?)
+    }
+
+    pub async fn create_by_email(
+        db: &mut DbConn,
+        email: &str,
+    ) -> crate::error::Result<Self> {
+        Ok(diesel::insert_into(dsl::creators)
+            .values(dsl::email.eq(email))
+            .returning(Creator::as_returning())
+            .get_result(db)
+            .await?)
     }
 }
 

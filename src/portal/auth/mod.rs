@@ -1,38 +1,27 @@
 pub mod github;
 
-use crate::db::CreatorToken;
-use reqwest::Client;
-use reqwest::{
-    header,
-    header::{HeaderMap, HeaderValue},
-};
-use rocket::http::CookieJar;
-use rocket::response::Redirect;
+use axum::Router;
+use github::GithubAuthConfig;
+use serde::Deserialize;
 
-pub struct AuthClient(Client);
+use crate::db::DbPool;
 
-pub fn routes() -> Vec<rocket::Route> {
-    routes![logout]
+#[derive(Deserialize, Clone, Debug)]
+pub struct AuthConfig {
+    github: Option<GithubAuthConfig>,
 }
 
-impl Default for AuthClient {
-    fn default() -> Self {
-        let mut headers = HeaderMap::default();
-        headers.append(header::ACCEPT, HeaderValue::from_static("application/json"));
-        headers.append(
-            header::USER_AGENT,
-            HeaderValue::from_static("Earthmark-Imagefork"),
-        );
-        Self(Client::builder().default_headers(headers).build().unwrap())
-    }
+pub fn routes(db: DbPool, config: &AuthConfig) -> Router {
+    let router = Router::new();
+    let router = if let Some(config) = &config.github {
+        router.nest("/github", github::routes(db, config))
+    } else {
+        router
+    };
+    router
 }
 
-#[get("/logout")]
-fn logout(jar: &CookieJar<'_>) -> Redirect {
-    CreatorToken::remove_from_cookie_jar(jar);
-    Redirect::to("/")
-}
-
+/*
 #[cfg(test)]
 pub mod test {
     use crate::db::{CreatorToken, Imagefork};
@@ -57,3 +46,4 @@ pub mod test {
         Ok(Redirect::to("/"))
     }
 }
+*/

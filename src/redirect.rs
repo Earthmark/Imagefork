@@ -15,13 +15,13 @@ use mediatype::MediaType;
 use serde::Deserialize;
 
 #[derive(Deserialize, Clone)]
-pub struct RedirectOptions {
+pub struct RedirectConfig {
     pub coherency_token_redis_url: String,
     pub coherency_token_keepalive_minutes: u32,
 }
 
 #[derive(Clone)]
-struct RedirectConfig {
+struct RedirectSettings {
     redirect_token_keepalive_seconds: u32,
 }
 
@@ -29,7 +29,7 @@ struct RedirectConfig {
 struct RedirectState {
     db: DbPool,
     tokens: CoherencyTokenPool,
-    config: RedirectConfig,
+    config: RedirectSettings,
 }
 
 pub fn create_router(
@@ -42,7 +42,7 @@ pub fn create_router(
         .with_state(RedirectState {
             db,
             tokens,
-            config: RedirectConfig {
+            config: RedirectSettings {
                 redirect_token_keepalive_seconds,
             },
         })
@@ -51,7 +51,7 @@ pub fn create_router(
 async fn handle_redirect_internal(
     mut db: DbConn,
     mut cache: CoherencyTokenConn,
-    config: RedirectConfig,
+    config: RedirectSettings,
     token: Option<&str>,
 ) -> crate::Result<Option<String>> {
     let id = match token {
@@ -85,7 +85,7 @@ static SAFE_IMAGE: StaticImage =
 async fn handler(
     db: DbConn,
     cache: CoherencyTokenConn,
-    State(config): State<RedirectConfig>,
+    State(config): State<RedirectSettings>,
     Path(token): Path<String>,
 ) -> EitherResp<Redirect, impl IntoResponse> {
     match handle_redirect_internal(db, cache, config, Some(&token)).await {

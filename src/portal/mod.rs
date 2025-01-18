@@ -1,19 +1,30 @@
-use rocket::Route;
+use axum::{extract::FromRef, Router};
+use serde::Deserialize;
 
-pub mod auth;
-pub mod creators;
-pub mod posters;
-pub mod token;
-pub mod ui;
+use crate::db::DbPool;
+
+mod auth;
+//mod creators;
+//mod posters;
+//mod token;
+//mod ui;
+
+#[derive(Deserialize, Clone)]
+pub struct PortalConfig {
+    auth: auth::AuthConfig,
+}
 
 #[derive(FromRef)]
-struct PortalState(DbPool, AppConfig);
+struct PortalState {
+    db: DbPool,
+}
 
-pub fn routes() -> Vec<Route> {
-    let mut routes = Vec::default();
-    routes.append(&mut auth::routes());
-    routes.append(&mut creators::routes());
-    routes.append(&mut posters::routes());
-    routes.append(&mut ui::routes());
-    routes
+pub fn routes(db: DbPool, config: &PortalConfig) -> Router {
+    Router::new().nest("/auth", auth::routes(db, &config.auth))
+    //let mut routes = Vec::default();
+    //routes.append(&mut auth::routes());
+    //routes.append(&mut creators::routes());
+    //routes.append(&mut posters::routes());
+    //routes.append(&mut ui::routes());
+    //routes
 }

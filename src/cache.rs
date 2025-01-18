@@ -15,11 +15,10 @@ pub type CoherencyTokenPool = bb8::Pool<CoherencyTokenManager>;
 
 pub struct CoherencyTokenConn(bb8::PooledConnection<'static, CoherencyTokenManager>);
 
-fn hash_token(token: &str) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(token);
-    let output = hasher.finalize();
-    base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(output)
+pub async fn build_pool(url: &str) -> crate::Result<CoherencyTokenPool> {
+    Ok(CoherencyTokenPool::builder()
+        .build(CoherencyTokenManager::new(url)?)
+        .await?)
 }
 
 impl<S> FromRequestParts<S> for CoherencyTokenConn
@@ -36,6 +35,13 @@ where
 
         Ok(Self(conn))
     }
+}
+
+fn hash_token(token: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(token);
+    let output = hasher.finalize();
+    base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(output)
 }
 
 impl CoherencyTokenConn {

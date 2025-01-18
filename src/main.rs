@@ -3,25 +3,25 @@ mod db;
 mod error;
 mod image;
 //mod image_meta;
-//mod portal;
 mod either_resp;
+mod portal;
 mod prelude;
 mod redirect;
 mod schema;
 mod service;
+mod reqs;
 
 use axum::{routing::get, Router};
 use axum_prometheus::PrometheusMetricLayer;
 use figment::providers::Format;
-use redirect::RedirectOptions;
 use serde::Deserialize;
 
 pub use error::*;
 use service::{run_with_ctl_c, Service};
-use tracing::{info, error};
+use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-fn config() -> AppOptions {
+fn config() -> AppConfig {
     figment::Figment::new()
         .join(figment::providers::Env::prefixed("APP_"))
         .join(figment::providers::Toml::file("imagefork.toml"))
@@ -40,7 +40,7 @@ fn init_tracing() {
         .init();
 }
 
-async fn run_app(opts: &AppOptions) -> Result<()> {
+async fn run_app(config: &AppConfig) -> Result<()> {
     let (monitoring_layer, monitoring_router) = {
         let (mut prometheus_layer, metric_handle) = PrometheusMetricLayer::pair();
         prometheus_layer.enable_response_body_size();
@@ -55,30 +55,24 @@ async fn run_app(opts: &AppOptions) -> Result<()> {
     };
 
     let app_router: Result<Router> = {
-        let db = db::DbPool::builder()
-            .build(db::DbManager::new(opts.core_pg_url.as_str()))
-            .await?;
+        let db = db::build_pool(&config.core_pg_url.as_str()).await?;
 
         let mut included_services = Vec::new();
 
         let mut router = Router::new();
-        if let Some(opts) = &opts.redirect {
+        if let Some(opts) = &config.redirect {
             included_services.push("redirect");
-            let tokens = cache::CoherencyTokenPool::builder()
-                .build(cache::CoherencyTokenManager::new(
-                    opts.coherency_token_redis_url.as_str(),
-                )?)
-                .await?;
+            let tokens = cache::build_pool(&opts.coherency_token_redis_url).await?;
 
             router = router.nest(
                 "/redirect",
-                redirect::create_router(db, tokens, opts.coherency_token_keepalive_minutes * 60),
+                redirect::create_router(db.clone(), tokens, opts.coherency_token_keepalive_minutes * 60),
             );
         }
 
-        if let Some(_opts) = &opts.portal {
+        if let Some(config) = &config.portal {
             included_services.push("portal");
-            // router = router.merge()
+            router = router.merge(portal::routes(db.clone(), config))
         }
 
         if included_services.is_empty() {
@@ -95,10 +89,10 @@ async fn run_app(opts: &AppOptions) -> Result<()> {
 
     run_with_ctl_c(
         [
-            Service::new("app", opts.app_addr.clone(), app_router?),
+            Service::new("app", config.app_addr.clone(), app_router?),
             Service::new(
                 "monitoring",
-                opts.monitoring_addr.clone(),
+                config.monitoring_addr.clone(),
                 monitoring_router,
             ),
         ]
@@ -110,16 +104,13 @@ async fn run_app(opts: &AppOptions) -> Result<()> {
 }
 
 #[derive(Deserialize, Clone)]
-struct AppOptions {
+struct AppConfig {
     app_addr: String,
     monitoring_addr: String,
     core_pg_url: String,
-    redirect: Option<RedirectOptions>,
-    portal: Option<PortalOptions>,
+    redirect: Option<redirect::RedirectConfig>,
+    portal: Option<portal::PortalConfig>,
 }
-
-#[derive(Deserialize, Clone)]
-struct PortalOptions {}
 
 #[tokio::main]
 async fn main() -> Result<()> {

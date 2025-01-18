@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
@@ -84,6 +86,8 @@ pub enum InternalError {
     RedisPool(#[from] bb8::RunError<bb8_redis::redis::RedisError>),
     #[error("Outbound Request: {0}")]
     Reqwest(#[from] reqwest::Error),
+    #[error("Outbound Request: {0}")]
+    ReqwestMiddleware(#[from] reqwest_middleware::Error),
     #[error("Serialization: {0}")]
     SerdeJson(#[from] serde_json::Error),
     #[error("System: {0}")]
@@ -91,6 +95,10 @@ pub enum InternalError {
 }
 
 impl InternalError {
+    pub fn system_error(prefix: impl Display) -> impl FnOnce(&str) -> Self {
+        move |context| Self::SystemError(format!("Internal error [{prefix}]: {context}"))
+    }
+
     pub fn counter_error_kind(&self) -> &'static str {
         match self {
             InternalError::Tcp(_) => "tcp",
@@ -100,6 +108,7 @@ impl InternalError {
             InternalError::Redis(_) => "redis",
             InternalError::RedisPool(_) => "redis-pool",
             InternalError::Reqwest(_) => "reqwest",
+            InternalError::ReqwestMiddleware(_) => "reqwest-middleware",
             InternalError::SerdeJson(_) => "serde",
             InternalError::SystemError(_) => "unknown",
         }

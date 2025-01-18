@@ -1,2 +1,2 @@
-DROP TABLE Posters;
-DROP TABLE Creators;
+DROP TABLE posters;
+DROP TABLE creators;
