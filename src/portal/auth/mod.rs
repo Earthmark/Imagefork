@@ -1,24 +1,11 @@
 pub mod github;
 
 use axum::Router;
-use github::GithubAuthConfig;
-use serde::Deserialize;
 
-use crate::db::DbPool;
+//pub const NEXT_URL_KEY: &str = "auth.next-url";
 
-#[derive(Deserialize, Clone, Debug)]
-pub struct AuthConfig {
-    github: Option<GithubAuthConfig>,
-}
-
-pub fn routes(db: DbPool, config: &AuthConfig) -> Router {
-    let router = Router::new();
-    let router = if let Some(config) = &config.github {
-        router.nest("/github", github::routes(db, config))
-    } else {
-        router
-    };
-    router
+pub fn routes() -> Router {
+    Router::new().nest("/github", github::routes())
 }
 
 /*

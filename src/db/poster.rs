@@ -1,9 +1,9 @@
 use super::DbConn;
 use crate::schema::posters::dsl;
-use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use serde::{Deserialize, Serialize};
+use time::PrimitiveDateTime;
 
 #[derive(Queryable, Selectable, Deserialize, Serialize, Debug)]
 #[diesel(table_name = crate::schema::posters)]
@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 pub struct Poster {
     id: i64,
     creator: i64,
-    creation_time: NaiveDateTime,
+    creation_time: PrimitiveDateTime,
     url: String,
     stopped: bool,
     lockout: bool,

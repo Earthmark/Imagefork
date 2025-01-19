@@ -2,3 +2,4 @@
 /Secrets.*
 /.env
 /.vscode
+/imagefork.toml

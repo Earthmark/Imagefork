@@ -3,21 +3,27 @@ mod db;
 mod error;
 mod image;
 //mod image_meta;
+mod auth;
 mod either_resp;
 mod portal;
 mod prelude;
 mod redirect;
+mod reqs;
 mod schema;
 mod service;
-mod reqs;
+mod session;
 
+use auth::Backend;
 use axum::{routing::get, Router};
+use axum_login::{login_required, AuthManagerLayerBuilder};
 use axum_prometheus::PrometheusMetricLayer;
 use figment::providers::Format;
 use serde::Deserialize;
 
 pub use error::*;
 use service::{run_with_ctl_c, Service};
+use time::Duration;
+use tower_sessions::SessionManagerLayer;
 use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -66,13 +72,30 @@ async fn run_app(config: &AppConfig) -> Result<()> {
 
             router = router.nest(
                 "/redirect",
-                redirect::create_router(db.clone(), tokens, opts.coherency_token_keepalive_minutes * 60),
+                redirect::create_router(
+                    db.clone(),
+                    tokens,
+                    opts.coherency_token_keepalive_minutes * 60,
+                ),
             );
         }
 
         if let Some(config) = &config.portal {
             included_services.push("portal");
-            router = router.merge(portal::routes(db.clone(), config))
+
+            let session_store = session::Store::new(db.clone());
+            let session_layer = SessionManagerLayer::new(session_store)
+                .with_secure(false)
+                .with_same_site(tower_sessions::cookie::SameSite::Lax)
+                .with_expiry(tower_sessions::Expiry::OnInactivity(Duration::days(1)));
+
+            let backend = auth::Backend::new(db.clone(), &config.auth);
+            let auth_layer = AuthManagerLayerBuilder::new(backend, session_layer).build();
+
+            router = router
+                .route_layer(login_required!(Backend, login_url = "/login"))
+                .merge(portal::routes())
+                .layer(auth_layer);
         }
 
         if included_services.is_empty() {

@@ -5,15 +5,16 @@ edition = "2021"
 
 [dependencies]
 askama = { version = "*", features = ["with-axum"] }
+async-trait = "*"
 axum = { version = "*", features = ["tower-log", "macros"] }
 axum-extra = { version = "*", features = ["typed-header"] }
+axum-login = "*"
 axum-prometheus = "*"
 base64 = "*"
 bb8 = "*"
 bb8-diesel = "*"
 bb8-redis = "*"
-chrono = { version = "*", features = ["serde"] }
-diesel = { version = "*", features = ["chrono"] }
+diesel = { version = "*", features = ["time"] }
 diesel-async = { version = "*", features = ["postgres", "bb8"] }
 figment = { version = "*", features = ["env", "toml"] }
 image = { version = "*", features = ["libwebp", "rgb"] }
@@ -27,12 +28,15 @@ reqwest = { version = "*", features = ["json"] }
 reqwest-middleware = { version = "*", features = ["json"] }
 reqwest-retry = { version = "*", features = ["tracing"] }
 reqwest-tracing = "*"
+rmp-serde = "*"
 rust-embed = "*"
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
 sha2 = "*"
 thiserror = "*"
+time = "*"
 tokio = { version = "*", features = ["full"] }
+tower-sessions = "*"
 tracing = "*"
 tracing-subscriber = { version = "*", features = ["env-filter"] }
 uuid = { version = "*", features = ["serde"] }

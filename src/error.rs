@@ -72,23 +72,25 @@ impl Error {
 
 #[derive(Error, Debug)]
 pub enum InternalError {
-    #[error("TCP: {0}")]
+    #[error(transparent)]
     Tcp(#[from] std::io::Error),
-    #[error("Sql: {0}")]
+    #[error(transparent)]
     Diesel(#[from] diesel::result::Error),
-    #[error("Sql-Init: {0}")]
+    #[error(transparent)]
     DieselInit(#[from] diesel_async::pooled_connection::PoolError),
-    #[error("Sql-Pool: {0}")]
+    #[error(transparent)]
     DieselPool(#[from] diesel_async::pooled_connection::bb8::RunError),
-    #[error("Redis: {0}")]
+    #[error(transparent)]
     Redis(#[from] bb8_redis::redis::RedisError),
-    #[error("Redis-Pool: {0}")]
+    #[error(transparent)]
     RedisPool(#[from] bb8::RunError<bb8_redis::redis::RedisError>),
-    #[error("Outbound Request: {0}")]
+    #[error(transparent)]
     Reqwest(#[from] reqwest::Error),
-    #[error("Outbound Request: {0}")]
+    #[error(transparent)]
     ReqwestMiddleware(#[from] reqwest_middleware::Error),
-    #[error("Serialization: {0}")]
+    //#[error(transparent)]
+    //OAuth(#[from] oauth2::basic::BasicRequestTokenError<_>),
+    #[error(transparent)]
     SerdeJson(#[from] serde_json::Error),
     #[error("System: {0}")]
     SystemError(String),

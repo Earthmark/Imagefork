@@ -1,32 +1,18 @@
 use super::DbConn;
 use crate::schema::creators::dsl;
-use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
-use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
-#[derive(Queryable, Selectable, Deserialize, Serialize)]
+#[derive(Queryable, Selectable, Clone, Debug)]
 #[diesel(table_name = crate::schema::creators)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct Creator {
     pub id: i64,
-    pub email: String,
-    pub creation_time: NaiveDateTime,
-    pub lockout: bool,
-    pub moderator: bool,
-    pub poster_limit: i32,
+    pub email_hash: Vec<u8>,
 }
 
 impl Creator {
-    pub async fn get(db: &mut DbConn, creator_id: i64) -> crate::error::Result<Option<Self>> {
-        Ok(dsl::creators
-            .find(creator_id)
-            .select(Creator::as_select())
-            .first(db)
-            .await
-            .optional()?)
-    }
-
     pub async fn get_by_email(db: &mut DbConn, email: &str) -> crate::error::Result<Option<Self>> {
         Ok(dsl::creators
             .filter(dsl::email.eq(email))
@@ -36,12 +22,16 @@ impl Creator {
             .optional()?)
     }
 
-    pub async fn create_by_email(
-        db: &mut DbConn,
-        email: &str,
-    ) -> crate::error::Result<Self> {
+    pub async fn create_by_email(db: &mut DbConn, email: &str) -> crate::error::Result<Self> {
+        let mut hasher = Sha256::new();
+        hasher.update(email);
+        // TODO: Possibly make this random every time, because it's in the DB, we just need to generate this safely.
+        const SALT: &str = "Technically this is a valid salt... but it's quite long. w4htr5g[9o0jin12ukm2h,q3e4t5rwg2a-908[ihy2jure3gtj1h0[ds2vc2bj0mp3io[]";
+        hasher.update(SALT);
+        let hash = hasher.finalize().to_vec();
+
         Ok(diesel::insert_into(dsl::creators)
-            .values(dsl::email.eq(email))
+            .values((dsl::email.eq(email), dsl::email_hash.eq(hash)))
             .returning(Creator::as_returning())
             .get_result(db)
             .await?)

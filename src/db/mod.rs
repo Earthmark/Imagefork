@@ -1,9 +1,5 @@
 pub mod creator;
-pub mod creator_session;
-pub mod creator_token;
-pub mod crsf_session;
 pub mod poster;
-mod util;
 
 use std::ops::{Deref, DerefMut};
 
@@ -13,7 +9,7 @@ use axum::{
 };
 use diesel_async::{
     pooled_connection::{
-        bb8::{Pool, PooledConnection},
+        bb8::{Pool, PooledConnection, RunError},
         AsyncDieselConnectionManager,
     },
     AsyncPgConnection,
@@ -30,6 +26,12 @@ pub struct DbConn(PooledConnection<'static, AsyncPgConnection>);
 
 pub async fn build_pool(url: &str) -> crate::Result<DbPool> {
     Ok(DbPool::builder().build(DbManager::new(url)).await?)
+}
+
+impl DbConn {
+    pub async fn from_pool(pool: &DbPool) -> Result<DbConn, RunError> {
+        Ok(Self(pool.get_owned().await?))
+    }
 }
 
 impl<S> FromRequestParts<S> for DbConn
