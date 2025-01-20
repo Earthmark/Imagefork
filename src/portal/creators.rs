@@ -1,29 +1,26 @@
-use crate::db::Creator;
-use crate::db::CreatorToken;
-use crate::db::Imagefork;
-use rocket::response::status::Unauthorized;
-use rocket::serde::json::Json;
-use rocket_db_pools::Connection;
+use axum::Router;
 
-use crate::Result;
 
-pub fn routes() -> Vec<rocket::Route> {
-    routes![get_creator, get_creator_no_token,]
+use crate::{auth::AuthSession, db::DbConn, Result};
+
+pub fn routes() -> Router {
+    Rotuer::new()
 }
 
-#[get("/creator", format = "json")]
+#[axum::debug_handler(state = super::PortalState)]
 async fn get_creator(
-    mut db: Connection<Imagefork>,
-    token: &CreatorToken,
+    db: DbConn,
+    auth_session: AuthSession,
 ) -> Result<Option<Json<Creator>>> {
-    Ok(Creator::get(&mut db, token.id).await?.map(Into::into))
+
 }
 
 #[get("/creator", format = "json", rank = 2)]
 fn get_creator_no_token() -> Unauthorized<()> {
-    Unauthorized(())
+    
 }
 
+/*
 #[cfg(test)]
 mod test {
     use crate::{db::Creator, test::*};
@@ -51,3 +48,4 @@ mod test {
         assert!(creator.poster_limit < 10);
     }
 }
+*/

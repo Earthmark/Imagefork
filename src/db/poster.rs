@@ -12,7 +12,6 @@ pub struct Poster {
     id: i64,
     creator: i64,
     creation_time: PrimitiveDateTime,
-    url: String,
     stopped: bool,
     lockout: bool,
     servable: bool,
@@ -20,9 +19,8 @@ pub struct Poster {
 
 #[derive(Insertable)]
 #[diesel(table_name = crate::schema::posters)]
-struct NewPoster<'a> {
+struct NewPoster {
     creator: i64,
-    url: &'a str,
 }
 
 define_sql_function!(fn random() -> Text);
@@ -53,15 +51,10 @@ impl Poster {
             .await?)
     }
 
-    pub async fn create(
-        db: &mut DbConn,
-        creator_id: i64,
-        poster_url: &str,
-    ) -> crate::error::Result<Option<Self>> {
+    pub async fn create(db: &mut DbConn, creator_id: i64) -> crate::error::Result<Option<Self>> {
         Ok(diesel::insert_into(dsl::posters)
             .values(NewPoster {
                 creator: creator_id,
-                url: poster_url,
             })
             .returning(Self::as_returning())
             .get_result(db)
@@ -109,15 +102,6 @@ impl Poster {
             .filter(dsl::servable)
             .order_by(random())
             .first(db)
-            .await
-            .optional()?)
-    }
-
-    pub async fn get_url(db: &mut DbConn, poster_id: i64) -> crate::Result<Option<String>> {
-        Ok(dsl::posters
-            .find(poster_id)
-            .select(dsl::url)
-            .get_result(db)
             .await
             .optional()?)
     }

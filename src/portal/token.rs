@@ -108,6 +108,7 @@ impl<'r> FromRequest<'r> for ModeratorToken<'r> {
     }
 }
 
+/*
 #[cfg(test)]
 mod test {
     use super::{CreatorToken, ModeratorToken};
@@ -191,3 +192,4 @@ mod test {
         );
     }
 }
+*/

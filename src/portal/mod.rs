@@ -1,7 +1,7 @@
-use axum::Router;
+use axum::{extract::FromRef, Router};
 use serde::Deserialize;
 
-use crate::auth::AuthConfig;
+use crate::{auth::AuthConfig, db::DbPool};
 
 mod auth;
 //mod creators;
@@ -12,6 +12,11 @@ mod auth;
 #[derive(Deserialize, Clone)]
 pub struct PortalConfig {
     pub auth: AuthConfig,
+}
+
+#[derive(FromRef, Clone)]
+pub struct PortalState {
+    db: DbPool
 }
 
 pub fn routes() -> Router {

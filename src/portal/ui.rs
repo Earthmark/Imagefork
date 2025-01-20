@@ -41,6 +41,7 @@ pub fn static_files() -> rocket::fs::FileServer {
     rocket::fs::FileServer::from("www")
 }
 
+/*
 #[cfg(test)]
 mod test {
     use crate::rocket;
@@ -55,3 +56,4 @@ mod test {
         assert_eq!(response.into_string().unwrap().len() > 10, true);
     }
 }
+*/

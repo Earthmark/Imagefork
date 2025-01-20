@@ -1,18 +1,19 @@
 use crate::{
     cache::{CoherencyTokenConn, CoherencyTokenPool},
-    db::{DbConn, DbPool, Poster},
+    db::{
+        poster_image::{PosterImage, PosterImageKind},
+        DbConn, DbPool, Poster,
+    },
     either_resp::EitherResp,
     image::StaticImage,
 };
 use axum::{
-    extract::{FromRef, Path, State},
-    http::StatusCode,
+    extract::{FromRef, Path, Query, State},
     response::{IntoResponse, Redirect},
     routing::get,
     Router,
 };
-use mediatype::MediaType;
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 
 #[derive(Deserialize, Clone)]
 pub struct RedirectConfig {
@@ -53,6 +54,7 @@ async fn handle_redirect_internal(
     mut cache: CoherencyTokenConn,
     config: RedirectSettings,
     token: Option<&str>,
+    image_kind: PosterImageKind,
 ) -> crate::Result<Option<String>> {
     let id = match token {
         None => Poster::get_id_of_approx(&mut db).await,
@@ -67,19 +69,61 @@ async fn handle_redirect_internal(
         }
     }?;
     if let Some(id) = id {
-        Poster::get_url(&mut db, id).await
+        PosterImage::get_url(&mut db, id, image_kind).await
     } else {
         Ok(None)
     }
 }
 
-static WEBP_MEDIA: MediaType =
-    MediaType::from_parts(mediatype::names::IMAGE, mediatype::names::WEBP, None, &[]);
+static IMAGE_WEBP: mediatype::MediaType =
+    mediatype::MediaType::from_parts(mediatype::names::IMAGE, mediatype::names::WEBP, None, &[]);
+static IMAGE_PNG: mediatype::MediaType =
+    mediatype::MediaType::from_parts(mediatype::names::IMAGE, mediatype::names::PNG, None, &[]);
 
 static ERROR_IMAGE: StaticImage =
-    StaticImage::new(&WEBP_MEDIA, include_bytes!("../images/error.webp"));
+    StaticImage::new(&IMAGE_WEBP, include_bytes!("../images/error.webp"));
 static SAFE_IMAGE: StaticImage =
-    StaticImage::new(&WEBP_MEDIA, include_bytes!("../images/safe.webp"));
+    StaticImage::new(&IMAGE_WEBP, include_bytes!("../images/safe.webp"));
+
+static DEFAULT_NORMAL_PIXEL: StaticImage = StaticImage::new(
+    &IMAGE_PNG,
+    include_bytes!("../images/default_normal_pixel.png"),
+);
+static BLACK_PIXEL: StaticImage =
+    StaticImage::new(&IMAGE_PNG, include_bytes!("../images/black_pixel.png"));
+
+fn image_fallback(requested_image_kind: PosterImageKind, error: bool) -> impl IntoResponse {
+    match requested_image_kind {
+        PosterImageKind::Albedo => {
+            if error {
+                ERROR_IMAGE.clone()
+            } else {
+                SAFE_IMAGE.clone()
+            }
+        }
+        PosterImageKind::Emissive => BLACK_PIXEL.clone(),
+        PosterImageKind::Normal => DEFAULT_NORMAL_PIXEL.clone(),
+    }
+}
+
+fn image_kind_deserializer<'de, D>(d: D) -> Result<PosterImageKind, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = <&str>::deserialize(d)?;
+    match s {
+        "a" => Ok(PosterImageKind::Albedo),
+        "n" => Ok(PosterImageKind::Normal),
+        "e" => Ok(PosterImageKind::Emissive),
+        _ => Err(serde::de::Error::custom("Unable to parse image kind.")),
+    }
+}
+
+#[derive(Deserialize)]
+struct QueryArgs {
+    #[serde(default, rename = "k", deserialize_with = "image_kind_deserializer")]
+    image_kind: PosterImageKind,
+}
 
 #[axum::debug_handler(state = RedirectState)]
 async fn handler(
@@ -87,13 +131,14 @@ async fn handler(
     cache: CoherencyTokenConn,
     State(config): State<RedirectSettings>,
     Path(token): Path<String>,
-) -> EitherResp<Redirect, impl IntoResponse> {
-    match handle_redirect_internal(db, cache, config, Some(&token)).await {
-        Ok(Some(url)) => EitherResp::A(Redirect::temporary(&url)),
-        Ok(None) => EitherResp::B((StatusCode::NOT_FOUND, SAFE_IMAGE.to_response())),
+    Query(QueryArgs { image_kind }): Query<QueryArgs>,
+) -> impl IntoResponse {
+    match handle_redirect_internal(db, cache, config, Some(&token), image_kind.clone()).await {
+        Ok(Some(url)) => EitherResp::A(Redirect::to(&url)),
+        Ok(None) => EitherResp::B(image_fallback(image_kind, false)),
         Err(e) => {
             tracing::warn!("Error resolving redirect {}", e);
-            EitherResp::B((StatusCode::INTERNAL_SERVER_ERROR, ERROR_IMAGE.to_response()))
+            EitherResp::B(image_fallback(image_kind, true))
         }
     }
 }

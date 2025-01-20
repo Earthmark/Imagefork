@@ -1,5 +1,6 @@
 pub mod creator;
 pub mod poster;
+pub mod poster_image;
 
 use std::ops::{Deref, DerefMut};
 

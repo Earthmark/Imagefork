@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-askama = { version = "*", features = ["with-axum"] }
+askama_axum = "*"
 async-trait = "*"
 axum = { version = "*", features = ["tower-log", "macros"] }
 axum-extra = { version = "*", features = ["typed-header"] }

@@ -94,6 +94,7 @@ async fn delete_poster(
     Ok(poster.into())
 }
 
+/*
 #[cfg(test)]
 mod test {
     use crate::{db::Poster, test::*};
@@ -131,3 +132,4 @@ mod test {
         );
     }
 }
+*/
