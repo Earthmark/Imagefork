@@ -11,6 +11,8 @@ use tower_sessions::Session;
 
 use crate::auth::{AuthSession, Credentials, CSRF_STATE_KEY};
 
+use super::{Next, NEXT_URL_KEY};
+
 pub fn routes() -> Router {
     Router::new()
         .route("/", get(begin))
@@ -18,13 +20,21 @@ pub fn routes() -> Router {
 }
 
 #[axum::debug_handler]
-async fn begin(auth_session: AuthSession, session: Session) -> impl IntoResponse {
+async fn begin(
+    auth_session: AuthSession,
+    session: Session,
+    Query(Next { next }): Query<Next>,
+) -> impl IntoResponse {
     let (auth_url, csrf_token) = auth_session.backend.authorize_url();
 
     session
         .insert(CSRF_STATE_KEY, csrf_token.secret())
         .await
         .expect("Inserting CRSF into session.");
+    session
+        .insert(NEXT_URL_KEY, next.unwrap_or_else(|| "/".into()))
+        .await
+        .expect("Inserting next url key");
 
     Redirect::to(auth_url.as_str())
 }
@@ -64,5 +74,9 @@ async fn authorize(
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
 
-    Redirect::to("/").into_response()
+    if let Ok(Some(next)) = session.remove::<String>(NEXT_URL_KEY).await {
+        Redirect::to(&next).into_response()
+    } else {
+        Redirect::to("/").into_response()
+    }
 }

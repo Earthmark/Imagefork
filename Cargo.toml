@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-askama_axum = "*"
+askama = "*"
 async-trait = "*"
 axum = { version = "*", features = ["tower-log", "macros"] }
 axum-extra = { version = "*", features = ["typed-header"] }
@@ -29,9 +29,7 @@ reqwest-middleware = { version = "*", features = ["json"] }
 reqwest-retry = { version = "*", features = ["tracing"] }
 reqwest-tracing = "*"
 rmp-serde = "*"
-rust-embed = "*"
 serde = { version = "*", features = ["derive"] }
-serde_json = "*"
 sha2 = "*"
 thiserror = "*"
 time = "*"

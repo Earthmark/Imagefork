@@ -1,23 +1,29 @@
-use axum::Router;
+use askama::Template;
+use axum::{response::IntoResponse, routing::get, Router};
 
+use crate::{auth::AuthSession, db::DbConn, html::HtmlTemplate};
 
-use crate::{auth::AuthSession, db::DbConn, Result};
+#[derive(Template)]
+#[template(path = "creator.html")]
+struct CreatorTemplate<'a> {
+    title: &'a str,
+    name: &'a str,
+    show_login: bool,
+    logged_in: bool,
+}
 
-pub fn routes() -> Router {
-    Rotuer::new()
+pub fn routes() -> Router<super::PortalState> {
+    Router::new().route("/", get(get_creator))
 }
 
 #[axum::debug_handler(state = super::PortalState)]
-async fn get_creator(
-    db: DbConn,
-    auth_session: AuthSession,
-) -> Result<Option<Json<Creator>>> {
-
-}
-
-#[get("/creator", format = "json", rank = 2)]
-fn get_creator_no_token() -> Unauthorized<()> {
-    
+async fn get_creator(db: DbConn, auth_session: AuthSession) -> impl IntoResponse {
+    HtmlTemplate(CreatorTemplate {
+        title: "Creator",
+        name: "taco",
+        show_login: true,
+        logged_in: auth_session.user.is_some(),
+    })
 }
 
 /*

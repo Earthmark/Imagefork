@@ -4,6 +4,7 @@ use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use serde::{Deserialize, Serialize};
 use time::PrimitiveDateTime;
+use tracing::instrument;
 
 #[derive(Queryable, Selectable, Deserialize, Serialize, Debug)]
 #[diesel(table_name = crate::schema::posters)]
@@ -26,7 +27,7 @@ struct NewPoster {
 define_sql_function!(fn random() -> Text);
 
 impl Poster {
-    pub async fn get(
+    pub async fn _get(
         db: &mut DbConn,
         creator_id: i64,
         poster_id: i64,
@@ -39,7 +40,7 @@ impl Poster {
             .optional()?)
     }
 
-    pub async fn get_all_by_creator(
+    pub async fn _get_all_by_creator(
         db: &mut DbConn,
         creator_id: i64,
     ) -> crate::error::Result<Vec<Self>> {
@@ -51,7 +52,7 @@ impl Poster {
             .await?)
     }
 
-    pub async fn create(db: &mut DbConn, creator_id: i64) -> crate::error::Result<Option<Self>> {
+    pub async fn _create(db: &mut DbConn, creator_id: i64) -> crate::error::Result<Option<Self>> {
         Ok(diesel::insert_into(dsl::posters)
             .values(NewPoster {
                 creator: creator_id,
@@ -62,7 +63,7 @@ impl Poster {
             .optional()?)
     }
 
-    pub async fn update(
+    pub async fn _update(
         db: &mut DbConn,
         creator_id: i64,
         poster_id: i64,
@@ -80,7 +81,7 @@ impl Poster {
         .optional()?)
     }
 
-    pub async fn delete(
+    pub async fn _delete(
         db: &mut DbConn,
         creator_id: i64,
         poster_id: i64,
@@ -96,6 +97,7 @@ impl Poster {
         .optional()?)
     }
 
+    #[instrument(skip(db))]
     pub async fn get_id_of_approx(db: &mut DbConn) -> crate::Result<Option<i64>> {
         Ok(dsl::posters
             .select(dsl::id)

@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, sync::Arc};
 
 use axum::{
     http::StatusCode,
@@ -91,7 +91,7 @@ pub enum InternalError {
     //#[error(transparent)]
     //OAuth(#[from] oauth2::basic::BasicRequestTokenError<_>),
     #[error(transparent)]
-    SerdeJson(#[from] serde_json::Error),
+    AxumLogin(#[from] Arc<axum_login::Error<crate::auth::Backend>>),
     #[error("System: {0}")]
     SystemError(String),
 }
@@ -111,8 +111,8 @@ impl InternalError {
             InternalError::RedisPool(_) => "redis-pool",
             InternalError::Reqwest(_) => "reqwest",
             InternalError::ReqwestMiddleware(_) => "reqwest-middleware",
-            InternalError::SerdeJson(_) => "serde",
             InternalError::SystemError(_) => "unknown",
+            InternalError::AxumLogin(_) => "login",
         }
     }
 }

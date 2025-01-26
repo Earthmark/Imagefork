@@ -9,6 +9,7 @@ use diesel::{
 };
 use diesel_async::RunQueryDsl;
 use serde::{Deserialize, Serialize};
+use tracing::instrument;
 
 use crate::schema::poster_image::dsl;
 
@@ -60,6 +61,7 @@ pub struct PosterImage {
 }
 
 impl PosterImage {
+    #[instrument(skip(db))]
     pub async fn get_url(
         db: &mut DbConn,
         poster_id: i64,

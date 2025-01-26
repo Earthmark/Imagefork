@@ -8,6 +8,7 @@ use tower_sessions::{
     session_store::{self},
     ExpiredDeletion, SessionStore,
 };
+use tracing::instrument;
 
 use crate::db::{DbConn, DbPool};
 use crate::schema::sessions::dsl;
@@ -39,6 +40,7 @@ impl Store {
 
 #[async_trait::async_trait]
 impl SessionStore for Store {
+    #[instrument(skip(self, session_record))]
     async fn create(&self, session_record: &mut Record) -> session_store::Result<()> {
         let db = &mut self.db().await?;
 
@@ -62,6 +64,7 @@ impl SessionStore for Store {
         Ok(())
     }
 
+    #[instrument(skip(self, session_record))]
     async fn save(&self, session_record: &Record) -> session_store::Result<()> {
         let db = &mut self.db().await?;
 
@@ -80,6 +83,7 @@ impl SessionStore for Store {
         Ok(())
     }
 
+    #[instrument(skip(self, session_id))]
     async fn load(&self, session_id: &Id) -> session_store::Result<Option<Record>> {
         let db = &mut self.db().await?;
 
@@ -99,6 +103,7 @@ impl SessionStore for Store {
         }
     }
 
+    #[instrument(skip(self, session_id))]
     async fn delete(&self, session_id: &Id) -> session_store::Result<()> {
         let db = &mut self.db().await?;
 

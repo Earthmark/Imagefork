@@ -5,6 +5,7 @@ mod image;
 //mod image_meta;
 mod auth;
 mod either_resp;
+mod html;
 mod portal;
 mod prelude;
 mod redirect;
@@ -13,9 +14,8 @@ mod schema;
 mod service;
 mod session;
 
-use auth::Backend;
 use axum::{routing::get, Router};
-use axum_login::{login_required, AuthManagerLayerBuilder};
+use axum_login::AuthManagerLayerBuilder;
 use axum_prometheus::PrometheusMetricLayer;
 use figment::providers::Format;
 use serde::Deserialize;
@@ -29,7 +29,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 fn config() -> AppConfig {
     figment::Figment::new()
-        .join(figment::providers::Env::prefixed("APP_"))
+        .join(figment::providers::Env::prefixed("APP_").split("_"))
         .join(figment::providers::Toml::file("imagefork.toml"))
         .extract()
         .unwrap()
@@ -92,10 +92,7 @@ async fn run_app(config: &AppConfig) -> Result<()> {
             let backend = auth::Backend::new(db.clone(), &config.auth);
             let auth_layer = AuthManagerLayerBuilder::new(backend, session_layer).build();
 
-            router = router
-                .route_layer(login_required!(Backend, login_url = "/login"))
-                .merge(portal::routes())
-                .layer(auth_layer);
+            router = router.merge(portal::routes(db.clone())).layer(auth_layer);
         }
 
         if included_services.is_empty() {

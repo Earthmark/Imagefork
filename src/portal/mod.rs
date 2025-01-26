@@ -1,10 +1,14 @@
 use axum::{extract::FromRef, Router};
+use axum_login::login_required;
 use serde::Deserialize;
 
-use crate::{auth::AuthConfig, db::DbPool};
+use crate::{
+    auth::{AuthConfig, Backend},
+    db::DbPool,
+};
 
 mod auth;
-//mod creators;
+mod creators;
 //mod posters;
 //mod token;
 //mod ui;
@@ -16,15 +20,13 @@ pub struct PortalConfig {
 
 #[derive(FromRef, Clone)]
 pub struct PortalState {
-    db: DbPool
+    db: DbPool,
 }
 
-pub fn routes() -> Router {
-    Router::new().nest("/auth", auth::routes())
-    //let mut routes = Vec::default();
-    //routes.append(&mut auth::routes());
-    //routes.append(&mut creators::routes());
-    //routes.append(&mut posters::routes());
-    //routes.append(&mut ui::routes());
-    //routes
+pub fn routes(db: DbPool) -> Router {
+    Router::new()
+        .nest("/creator", creators::routes())
+        .with_state(PortalState { db })
+        .route_layer(login_required!(Backend, login_url = "/auth/github"))
+        .nest("/auth", auth::routes())
 }

@@ -3,6 +3,7 @@ use crate::schema::creators::dsl;
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use sha2::{Digest, Sha256};
+use tracing::instrument;
 
 #[derive(Queryable, Selectable, Clone, Debug)]
 #[diesel(table_name = crate::schema::creators)]
@@ -13,6 +14,7 @@ pub struct Creator {
 }
 
 impl Creator {
+    #[instrument(skip(db))]
     pub async fn get_by_email(db: &mut DbConn, email: &str) -> crate::error::Result<Option<Self>> {
         Ok(dsl::creators
             .filter(dsl::email.eq(email))
@@ -22,6 +24,7 @@ impl Creator {
             .optional()?)
     }
 
+    #[instrument(skip(db))]
     pub async fn create_by_email(db: &mut DbConn, email: &str) -> crate::error::Result<Self> {
         let mut hasher = Sha256::new();
         hasher.update(email);

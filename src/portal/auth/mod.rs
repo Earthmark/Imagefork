@@ -1,11 +1,34 @@
 pub mod github;
 
-use axum::Router;
+use axum::{
+    response::{IntoResponse, Redirect},
+    routing::get,
+    Router,
+};
+use serde::Deserialize;
 
-//pub const NEXT_URL_KEY: &str = "auth.next-url";
+use crate::auth::AuthSession;
+
+pub const NEXT_URL_KEY: &str = "auth.next-url";
+
+#[derive(Deserialize)]
+struct Next {
+    next: Option<String>,
+}
 
 pub fn routes() -> Router {
-    Router::new().nest("/github", github::routes())
+    Router::new()
+        .route("/logout", get(logout))
+        .nest("/github", github::routes())
+}
+
+#[axum::debug_handler]
+async fn logout(mut auth_session: AuthSession) -> crate::Result<impl IntoResponse> {
+    if auth_session.user.is_some() {
+        auth_session.logout().await.map_err(std::sync::Arc::new)?;
+    }
+
+    Ok(Redirect::to("/"))
 }
 
 /*
