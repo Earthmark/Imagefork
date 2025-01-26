@@ -12,10 +12,7 @@ axum-login = "*"
 axum-prometheus = "*"
 base64 = "*"
 bb8 = "*"
-bb8-diesel = "*"
 bb8-redis = "*"
-diesel = { version = "*", features = ["time"] }
-diesel-async = { version = "*", features = ["postgres", "bb8"] }
 figment = { version = "*", features = ["env", "toml"] }
 image = { version = "*", features = ["libwebp", "rgb"] }
 lazy_static = "*"
@@ -31,6 +28,7 @@ reqwest-tracing = "*"
 rmp-serde = "*"
 serde = { version = "*", features = ["derive"] }
 sha2 = "*"
+sqlx = { version = "*", features = ["runtime-tokio", "postgres", "time"] }
 thiserror = "*"
 time = "*"
 tokio = { version = "*", features = ["full"] }

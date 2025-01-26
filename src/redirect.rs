@@ -2,7 +2,7 @@ use crate::{
     cache::{CoherencyTokenConn, CoherencyTokenPool},
     db::{
         poster_image::{PosterImage, PosterImageKind},
-        DbConn, DbPool, Poster,
+        DbPool, Poster,
     },
     either_resp::EitherResp,
     image::StaticImage,
@@ -50,26 +50,26 @@ pub fn create_router(
 }
 
 async fn handle_redirect_internal(
-    mut db: DbConn,
+    db: &DbPool,
     mut cache: CoherencyTokenConn,
     config: RedirectSettings,
     token: Option<&str>,
     image_kind: PosterImageKind,
 ) -> crate::Result<Option<String>> {
     let id = match token {
-        None => Poster::get_id_of_approx(&mut db).await,
+        None => Poster::get_id_of_approx(db).await,
         Some(token) => {
             cache
                 .get_or_create(
                     token,
                     config.redirect_token_keepalive_seconds,
-                    Poster::get_id_of_approx(&mut db),
+                    Poster::get_id_of_approx(db),
                 )
                 .await
         }
     }?;
     if let Some(id) = id {
-        PosterImage::get_url(&mut db, id, image_kind).await
+        PosterImage::get_url(db, id, image_kind).await
     } else {
         Ok(None)
     }
@@ -127,13 +127,13 @@ struct QueryArgs {
 
 #[axum::debug_handler(state = RedirectState)]
 async fn handler(
-    db: DbConn,
     cache: CoherencyTokenConn,
+    State(db): State<DbPool>,
     State(config): State<RedirectSettings>,
     Path(token): Path<String>,
     Query(QueryArgs { image_kind }): Query<QueryArgs>,
 ) -> impl IntoResponse {
-    match handle_redirect_internal(db, cache, config, Some(&token), image_kind.clone()).await {
+    match handle_redirect_internal(&db, cache, config, Some(&token), image_kind.clone()).await {
         Ok(Some(url)) => EitherResp::A(Redirect::to(&url)),
         Ok(None) => EitherResp::B(image_fallback(image_kind, false)),
         Err(e) => {

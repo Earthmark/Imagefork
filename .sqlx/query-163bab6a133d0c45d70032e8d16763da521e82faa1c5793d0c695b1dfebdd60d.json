@@ -1,0 +1,54 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE posters\n        SET stopped = $3\n        WHERE id = $1 AND creator = $2\n        RETURNING *\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "creator",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "creation_time",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 3,
+        "name": "stopped",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 4,
+        "name": "lockout",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "servable",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "163bab6a133d0c45d70032e8d16763da521e82faa1c5793d0c695b1dfebdd60d"
+}

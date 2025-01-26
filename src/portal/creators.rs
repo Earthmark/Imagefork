@@ -1,7 +1,7 @@
 use askama::Template;
 use axum::{response::IntoResponse, routing::get, Router};
 
-use crate::{auth::AuthSession, db::DbConn, html::HtmlTemplate};
+use crate::{auth::AuthSession, html::HtmlTemplate};
 
 #[derive(Template)]
 #[template(path = "creator.html")]
@@ -17,7 +17,7 @@ pub fn routes() -> Router<super::PortalState> {
 }
 
 #[axum::debug_handler(state = super::PortalState)]
-async fn get_creator(db: DbConn, auth_session: AuthSession) -> impl IntoResponse {
+async fn get_creator(auth_session: AuthSession) -> impl IntoResponse {
     HtmlTemplate(CreatorTemplate {
         title: "Creator",
         name: "taco",

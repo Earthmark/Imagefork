@@ -1,0 +1,53 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        DELETE FROM posters\n        WHERE id = $1 AND creator = $2\n        RETURNING *\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "creator",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "creation_time",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 3,
+        "name": "stopped",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 4,
+        "name": "lockout",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "servable",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "7b9cd63bdd8b610ba5c564292ab3ec3a0cfd14e73f3dfe579773e00663f0ae37"
+}

@@ -1,22 +1,10 @@
-use std::io::Write;
-
-use diesel::{
-    deserialize::{FromSql, FromSqlRow},
-    expression::AsExpression,
-    pg::Pg,
-    prelude::*,
-    serialize::{IsNull, ToSql},
-};
-use diesel_async::RunQueryDsl;
 use serde::{Deserialize, Serialize};
 use tracing::instrument;
 
-use crate::schema::poster_image::dsl;
+use super::DbPool;
 
-use super::DbConn;
-
-#[derive(Clone, Debug, AsExpression, FromSqlRow, Deserialize, Serialize, Default)]
-#[diesel(sql_type = crate::schema::sql_types::TextureKind)]
+#[derive(sqlx::Type, Clone, Debug, Deserialize, Serialize, Default)]
+#[sqlx(type_name = "texture_kind", rename_all = "lowercase")]
 pub enum PosterImageKind {
     #[default]
     Albedo,
@@ -24,54 +12,26 @@ pub enum PosterImageKind {
     Normal,
 }
 
-impl ToSql<crate::schema::sql_types::TextureKind, Pg> for PosterImageKind {
-    fn to_sql<'b>(
-        &'b self,
-        out: &mut diesel::serialize::Output<'b, '_, Pg>,
-    ) -> diesel::serialize::Result {
-        match *self {
-            PosterImageKind::Albedo => out.write_all(b"albedo")?,
-            PosterImageKind::Emissive => out.write_all(b"emissive")?,
-            PosterImageKind::Normal => out.write_all(b"normal")?,
-        }
-        Ok(IsNull::No)
-    }
-}
-
-impl FromSql<crate::schema::sql_types::TextureKind, Pg> for PosterImageKind {
-    fn from_sql(
-        bytes: <Pg as diesel::backend::Backend>::RawValue<'_>,
-    ) -> diesel::deserialize::Result<Self> {
-        match bytes.as_bytes() {
-            b"albedo" => Ok(PosterImageKind::Albedo),
-            b"emissive" => Ok(PosterImageKind::Emissive),
-            b"normal" => Ok(PosterImageKind::Normal),
-            _ => Err("Unrecognized enum variant".into()),
-        }
-    }
-}
-
-#[derive(Queryable, Selectable, Deserialize, Serialize, Debug)]
-#[diesel(table_name = crate::schema::poster_image)]
-#[diesel(check_for_backend(diesel::pg::Pg))]
-pub struct PosterImage {
-    poster_id: i64,
-    kind: PosterImageKind,
-    url: String,
-}
+pub struct PosterImage {}
 
 impl PosterImage {
     #[instrument(skip(db))]
     pub async fn get_url(
-        db: &mut DbConn,
+        db: &DbPool,
         poster_id: i64,
         texture: PosterImageKind,
     ) -> crate::Result<Option<String>> {
-        Ok(dsl::poster_image
-            .find((poster_id, texture))
-            .select(dsl::url)
-            .get_result(db)
-            .await
-            .optional()?)
+        Ok(sqlx::query!(
+            r#"
+        SELECT url
+        FROM poster_image
+        WHERE poster = $1 AND kind = $2
+        "#,
+            poster_id,
+            texture as _,
+        )
+        .fetch_optional(db)
+        .await?
+        .map(|r| r.url))
     }
 }

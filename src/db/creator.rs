@@ -1,13 +1,8 @@
-use super::DbConn;
-use crate::schema::creators::dsl;
-use diesel::prelude::*;
-use diesel_async::RunQueryDsl;
+use super::DbPool;
 use sha2::{Digest, Sha256};
 use tracing::instrument;
 
-#[derive(Queryable, Selectable, Clone, Debug)]
-#[diesel(table_name = crate::schema::creators)]
-#[diesel(check_for_backend(diesel::pg::Pg))]
+#[derive(Clone, Debug)]
 pub struct Creator {
     pub id: i64,
     pub email_hash: Vec<u8>,
@@ -15,17 +10,22 @@ pub struct Creator {
 
 impl Creator {
     #[instrument(skip(db))]
-    pub async fn get_by_email(db: &mut DbConn, email: &str) -> crate::error::Result<Option<Self>> {
-        Ok(dsl::creators
-            .filter(dsl::email.eq(email))
-            .select(Creator::as_select())
-            .first(db)
-            .await
-            .optional()?)
+    pub async fn get_by_email(db: &DbPool, email: &str) -> crate::error::Result<Option<Self>> {
+        Ok(sqlx::query_as!(
+            Self,
+            r#"
+        SELECT id, email_hash
+        FROM creators
+        WHERE email = $1
+        "#,
+            email
+        )
+        .fetch_optional(db)
+        .await?)
     }
 
     #[instrument(skip(db))]
-    pub async fn create_by_email(db: &mut DbConn, email: &str) -> crate::error::Result<Self> {
+    pub async fn create_by_email(db: &DbPool, email: &str) -> crate::error::Result<Self> {
         let mut hasher = Sha256::new();
         hasher.update(email);
         // TODO: Possibly make this random every time, because it's in the DB, we just need to generate this safely.
@@ -33,11 +33,18 @@ impl Creator {
         hasher.update(SALT);
         let hash = hasher.finalize().to_vec();
 
-        Ok(diesel::insert_into(dsl::creators)
-            .values((dsl::email.eq(email), dsl::email_hash.eq(hash)))
-            .returning(Creator::as_returning())
-            .get_result(db)
-            .await?)
+        Ok(sqlx::query_as!(
+            Self,
+            r#"
+        INSERT INTO creators (email, email_hash)
+        VALUES ($1, $2)
+        RETURNING id, email_hash
+        "#,
+            email,
+            hash
+        )
+        .fetch_one(db)
+        .await?)
     }
 }
 

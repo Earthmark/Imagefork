@@ -1,0 +1,53 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT *\n        FROM posters\n        WHERE id = $1 AND creator = $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "creator",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "creation_time",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 3,
+        "name": "stopped",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 4,
+        "name": "lockout",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "servable",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "2a9e5604dffa7eb1d72aa0fcfbba451cac6463c0b8e6e32dd59acb172d47caad"
+}

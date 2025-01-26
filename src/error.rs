@@ -75,11 +75,7 @@ pub enum InternalError {
     #[error(transparent)]
     Tcp(#[from] std::io::Error),
     #[error(transparent)]
-    Diesel(#[from] diesel::result::Error),
-    #[error(transparent)]
-    DieselInit(#[from] diesel_async::pooled_connection::PoolError),
-    #[error(transparent)]
-    DieselPool(#[from] diesel_async::pooled_connection::bb8::RunError),
+    Sqlx(#[from] sqlx::Error),
     #[error(transparent)]
     Redis(#[from] bb8_redis::redis::RedisError),
     #[error(transparent)]
@@ -104,9 +100,7 @@ impl InternalError {
     pub fn counter_error_kind(&self) -> &'static str {
         match self {
             InternalError::Tcp(_) => "tcp",
-            InternalError::Diesel(_) => "diesel",
-            InternalError::DieselInit(_) => "diesel-init",
-            InternalError::DieselPool(_) => "diesel-pool",
+            InternalError::Sqlx(_) => "sqlx",
             InternalError::Redis(_) => "redis",
             InternalError::RedisPool(_) => "redis-pool",
             InternalError::Reqwest(_) => "reqwest",

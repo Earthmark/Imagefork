@@ -1,14 +1,9 @@
-use super::DbConn;
-use crate::schema::posters::dsl;
-use diesel::prelude::*;
-use diesel_async::RunQueryDsl;
+use super::DbPool;
 use serde::{Deserialize, Serialize};
 use time::PrimitiveDateTime;
 use tracing::instrument;
 
-#[derive(Queryable, Selectable, Deserialize, Serialize, Debug)]
-#[diesel(table_name = crate::schema::posters)]
-#[diesel(check_for_backend(diesel::pg::Pg))]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct Poster {
     id: i64,
     creator: i64,
@@ -18,94 +13,112 @@ pub struct Poster {
     servable: bool,
 }
 
-#[derive(Insertable)]
-#[diesel(table_name = crate::schema::posters)]
-struct NewPoster {
-    creator: i64,
-}
-
-define_sql_function!(fn random() -> Text);
-
 impl Poster {
     pub async fn _get(
-        db: &mut DbConn,
+        db: &DbPool,
         creator_id: i64,
         poster_id: i64,
     ) -> crate::error::Result<Option<Self>> {
-        Ok(dsl::posters
-            .filter(dsl::id.eq(poster_id).and(dsl::creator.eq(creator_id)))
-            .select(Self::as_select())
-            .first(&mut *db)
-            .await
-            .optional()?)
+        Ok(sqlx::query_as!(
+            Poster,
+            r#"
+        SELECT *
+        FROM posters
+        WHERE id = $1 AND creator = $2
+        "#,
+            poster_id,
+            creator_id
+        )
+        .fetch_optional(db)
+        .await?)
     }
 
     pub async fn _get_all_by_creator(
-        db: &mut DbConn,
+        db: &DbPool,
         creator_id: i64,
     ) -> crate::error::Result<Vec<Self>> {
-        Ok(dsl::posters
-            .filter(dsl::creator.eq(creator_id))
-            .order_by(dsl::id.desc())
-            .select(Poster::as_select())
-            .load(db)
-            .await?)
+        Ok(sqlx::query_as!(
+            Poster,
+            r#"
+        SELECT *
+        FROM posters
+        WHERE creator = $1
+        "#,
+            creator_id
+        )
+        .fetch_all(db)
+        .await?)
     }
 
-    pub async fn _create(db: &mut DbConn, creator_id: i64) -> crate::error::Result<Option<Self>> {
-        Ok(diesel::insert_into(dsl::posters)
-            .values(NewPoster {
-                creator: creator_id,
-            })
-            .returning(Self::as_returning())
-            .get_result(db)
-            .await
-            .optional()?)
+    pub async fn _create(db: &DbPool, creator_id: i64) -> crate::error::Result<Option<Self>> {
+        Ok(sqlx::query_as!(
+            Poster,
+            r#"
+        INSERT INTO posters (creator)
+        VALUES ($1)
+        RETURNING *
+        "#,
+            creator_id
+        )
+        .fetch_optional(db)
+        .await?)
     }
 
     pub async fn _update(
-        db: &mut DbConn,
+        db: &DbPool,
         creator_id: i64,
         poster_id: i64,
         is_stopped: bool,
     ) -> crate::error::Result<Option<Self>> {
-        Ok(diesel::update(
-            dsl::posters
-                .find(poster_id)
-                .filter(dsl::creator.eq(creator_id)),
+        Ok(sqlx::query_as!(
+            Self,
+            r#"
+        UPDATE posters
+        SET stopped = $3
+        WHERE id = $1 AND creator = $2
+        RETURNING *
+        "#,
+            creator_id,
+            poster_id,
+            is_stopped
         )
-        .set(dsl::stopped.eq(is_stopped))
-        .returning(Self::as_returning())
-        .get_result(db)
-        .await
-        .optional()?)
+        .fetch_optional(db)
+        .await?)
     }
 
     pub async fn _delete(
-        db: &mut DbConn,
+        db: &DbPool,
         creator_id: i64,
         poster_id: i64,
     ) -> crate::Result<Option<Self>> {
-        Ok(diesel::delete(
-            dsl::posters
-                .find(poster_id)
-                .filter(dsl::creator.eq(creator_id)),
+        Ok(sqlx::query_as!(
+            Self,
+            r#"
+        DELETE FROM posters
+        WHERE id = $1 AND creator = $2
+        RETURNING *
+        "#,
+            creator_id,
+            poster_id
         )
-        .returning(Self::as_returning())
-        .get_result(db)
-        .await
-        .optional()?)
+        .fetch_optional(db)
+        .await?)
     }
 
     #[instrument(skip(db))]
-    pub async fn get_id_of_approx(db: &mut DbConn) -> crate::Result<Option<i64>> {
-        Ok(dsl::posters
-            .select(dsl::id)
-            .filter(dsl::servable)
-            .order_by(random())
-            .first(db)
-            .await
-            .optional()?)
+    pub async fn get_id_of_approx(db: &DbPool) -> crate::Result<Option<i64>> {
+        Ok(sqlx::query!(
+            r#"
+            SELECT id
+            FROM posters
+            WHERE servable
+            ORDER BY random()
+            LIMIT 1
+        "#
+        )
+        .fetch_optional(db)
+        .await?
+        .map(|r| r.id))
     }
 }
 

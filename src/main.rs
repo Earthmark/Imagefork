@@ -10,7 +10,6 @@ mod portal;
 mod prelude;
 mod redirect;
 mod reqs;
-mod schema;
 mod service;
 mod session;
 

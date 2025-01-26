@@ -1,7 +1,5 @@
 use async_trait::async_trait;
 use axum_login::{AuthUser, AuthnBackend, UserId};
-use diesel::prelude::*;
-use diesel_async::RunQueryDsl;
 use oauth2::{
     basic::BasicClient, AuthorizationCode, CsrfToken, EndpointNotSet, EndpointSet, Scope,
     TokenResponse,
@@ -11,9 +9,8 @@ use serde::Deserialize;
 use tracing::{info, warn};
 
 use crate::{
-    db::{creator::Creator, DbConn, DbPool},
+    db::{creator::Creator, DbPool},
     reqs::{GithubApi, HttpClient},
-    schema::creators::dsl,
 };
 
 pub const CSRF_STATE_KEY: &str = "oauth.csrf-state";
@@ -127,27 +124,25 @@ impl AuthnBackend for Backend {
             .await?;
         let email = &emails[0].email;
 
-        let db = &mut DbConn::from_pool(&self.db).await?;
-
-        let creator = if let Some(creator) = Creator::get_by_email(db, email).await? {
+        let creator = if let Some(creator) = Creator::get_by_email(&self.db, email).await? {
             info!("Existing user logged in.");
             creator
         } else {
             info!("Creating new user, as a login was attempted for an unknown email.",);
-            Creator::create_by_email(db, email).await?
+            Creator::create_by_email(&self.db, email).await?
         };
 
         Ok(Some(creator))
     }
 
     async fn get_user(&self, user_id: &UserId<Self>) -> Result<Option<Self::User>, Self::Error> {
-        let db = &mut DbConn::from_pool(&self.db).await?;
-        Ok(dsl::creators
-            .filter(dsl::id.eq(user_id))
-            .select(Creator::as_select())
-            .get_result(db)
-            .await
-            .optional()?)
+        Ok(sqlx::query_as!(
+            Self::User,
+            "SELECT id, email_hash FROM creators WHERE id = $1",
+            user_id
+        )
+        .fetch_optional(&self.db)
+        .await?)
     }
 }
 
