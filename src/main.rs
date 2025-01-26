@@ -28,7 +28,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 fn config() -> AppConfig {
     figment::Figment::new()
-        .join(figment::providers::Env::prefixed("APP_").split("_"))
+        .join(figment::providers::Env::prefixed("APP_"))
         .join(figment::providers::Toml::file("imagefork.toml"))
         .extract()
         .unwrap()
