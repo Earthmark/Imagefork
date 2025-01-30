@@ -25,7 +25,7 @@ pub struct PortalState {
 
 pub fn routes(db: DbPool) -> Router {
     Router::new()
-        .nest("/creator", creators::routes())
+        .nest("/api", creators::routes())
         .with_state(PortalState { db })
         .route_layer(login_required!(Backend, login_url = "/auth/github"))
         .nest("/auth", auth::routes())

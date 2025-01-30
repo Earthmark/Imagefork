@@ -86,8 +86,8 @@ pub enum InternalError {
     ReqwestMiddleware(#[from] reqwest_middleware::Error),
     //#[error(transparent)]
     //OAuth(#[from] oauth2::basic::BasicRequestTokenError<_>),
-    #[error(transparent)]
-    AxumLogin(#[from] Arc<axum_login::Error<crate::auth::Backend>>),
+    //#[error(transparent)]
+    //AxumLogin(#[from] Arc<axum_login::Error<crate::auth::Backend>>),
     #[error("System: {0}")]
     SystemError(String),
 }
@@ -106,7 +106,7 @@ impl InternalError {
             InternalError::Reqwest(_) => "reqwest",
             InternalError::ReqwestMiddleware(_) => "reqwest-middleware",
             InternalError::SystemError(_) => "unknown",
-            InternalError::AxumLogin(_) => "login",
+            //InternalError::AxumLogin(_) => "login",
         }
     }
 }

@@ -6,7 +6,7 @@ use tracing::instrument;
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Poster {
     id: i64,
-    creator: i64,
+    user_id: i64,
     creation_time: PrimitiveDateTime,
     stopped: bool,
     lockout: bool,
@@ -14,97 +14,6 @@ pub struct Poster {
 }
 
 impl Poster {
-    pub async fn _get(
-        db: &DbPool,
-        creator_id: i64,
-        poster_id: i64,
-    ) -> crate::error::Result<Option<Self>> {
-        Ok(sqlx::query_as!(
-            Poster,
-            r#"
-        SELECT *
-        FROM posters
-        WHERE id = $1 AND creator = $2
-        "#,
-            poster_id,
-            creator_id
-        )
-        .fetch_optional(db)
-        .await?)
-    }
-
-    pub async fn _get_all_by_creator(
-        db: &DbPool,
-        creator_id: i64,
-    ) -> crate::error::Result<Vec<Self>> {
-        Ok(sqlx::query_as!(
-            Poster,
-            r#"
-        SELECT *
-        FROM posters
-        WHERE creator = $1
-        "#,
-            creator_id
-        )
-        .fetch_all(db)
-        .await?)
-    }
-
-    pub async fn _create(db: &DbPool, creator_id: i64) -> crate::error::Result<Option<Self>> {
-        Ok(sqlx::query_as!(
-            Poster,
-            r#"
-        INSERT INTO posters (creator)
-        VALUES ($1)
-        RETURNING *
-        "#,
-            creator_id
-        )
-        .fetch_optional(db)
-        .await?)
-    }
-
-    pub async fn _update(
-        db: &DbPool,
-        creator_id: i64,
-        poster_id: i64,
-        is_stopped: bool,
-    ) -> crate::error::Result<Option<Self>> {
-        Ok(sqlx::query_as!(
-            Self,
-            r#"
-        UPDATE posters
-        SET stopped = $3
-        WHERE id = $1 AND creator = $2
-        RETURNING *
-        "#,
-            creator_id,
-            poster_id,
-            is_stopped
-        )
-        .fetch_optional(db)
-        .await?)
-    }
-
-    pub async fn _delete(
-        db: &DbPool,
-        creator_id: i64,
-        poster_id: i64,
-    ) -> crate::Result<Option<Self>> {
-        Ok(sqlx::query_as!(
-            Self,
-            r#"
-        DELETE FROM posters
-        WHERE id = $1 AND creator = $2
-        RETURNING *
-        "#,
-            creator_id,
-            poster_id
-        )
-        .fetch_optional(db)
-        .await?)
-    }
-
     #[instrument(skip(db))]
     pub async fn get_id_of_approx(db: &DbPool) -> crate::Result<Option<i64>> {
         Ok(sqlx::query!(

@@ -3,15 +3,14 @@ mod db;
 mod error;
 mod image;
 //mod image_meta;
-mod auth;
-mod either_resp;
-mod html;
-mod portal;
+//mod auth;
+//mod html;
+//mod portal;
 mod prelude;
 mod redirect;
 mod reqs;
 mod service;
-mod session;
+//mod session;
 
 use axum::{routing::get, Router};
 use axum_login::AuthManagerLayerBuilder;
@@ -79,6 +78,7 @@ async fn run_app(config: &AppConfig) -> Result<()> {
             );
         }
 
+        /*
         if let Some(config) = &config.portal {
             included_services.push("portal");
 
@@ -93,6 +93,7 @@ async fn run_app(config: &AppConfig) -> Result<()> {
 
             router = router.merge(portal::routes(db.clone())).layer(auth_layer);
         }
+        */
 
         if included_services.is_empty() {
             error!("No services were selected to be run in the app binding.");
@@ -128,7 +129,7 @@ struct AppConfig {
     monitoring_addr: String,
     core_pg_url: String,
     redirect: Option<redirect::RedirectConfig>,
-    portal: Option<portal::PortalConfig>,
+    //portal: Option<portal::PortalConfig>,
 }
 
 #[tokio::main]

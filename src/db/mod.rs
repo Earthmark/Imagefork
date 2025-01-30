@@ -1,4 +1,3 @@
-pub mod creator;
 pub mod poster;
 pub mod poster_image;
 

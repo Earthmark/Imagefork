@@ -4,7 +4,6 @@ use crate::{
         poster_image::{PosterImage, PosterImageKind},
         DbPool, Poster,
     },
-    either_resp::EitherResp,
     image::StaticImage,
 };
 use axum::{
@@ -13,6 +12,7 @@ use axum::{
     routing::get,
     Router,
 };
+use axum_extra::either::Either;
 use serde::{Deserialize, Deserializer};
 
 #[derive(Deserialize, Clone)]
@@ -53,21 +53,16 @@ async fn handle_redirect_internal(
     db: &DbPool,
     mut cache: CoherencyTokenConn,
     config: RedirectSettings,
-    token: Option<&str>,
+    token: &str,
     image_kind: PosterImageKind,
 ) -> crate::Result<Option<String>> {
-    let id = match token {
-        None => Poster::get_id_of_approx(db).await,
-        Some(token) => {
-            cache
-                .get_or_create(
-                    token,
-                    config.redirect_token_keepalive_seconds,
-                    Poster::get_id_of_approx(db),
-                )
-                .await
-        }
-    }?;
+    let id = cache
+        .get_or_create(
+            token,
+            config.redirect_token_keepalive_seconds,
+            Poster::get_id_of_approx(db),
+        )
+        .await?;
     if let Some(id) = id {
         PosterImage::get_url(db, id, image_kind).await
     } else {
@@ -80,31 +75,54 @@ static IMAGE_WEBP: mediatype::MediaType =
 static IMAGE_PNG: mediatype::MediaType =
     mediatype::MediaType::from_parts(mediatype::names::IMAGE, mediatype::names::PNG, None, &[]);
 
-static ERROR_IMAGE: StaticImage =
-    StaticImage::new(&IMAGE_WEBP, include_bytes!("../images/error.webp"));
-static SAFE_IMAGE: StaticImage =
-    StaticImage::new(&IMAGE_WEBP, include_bytes!("../images/safe.webp"));
+struct CannedImage {
+    albedo: StaticImage,
+    emissive: Option<StaticImage>,
+    normal: Option<StaticImage>,
+}
 
 static DEFAULT_NORMAL_PIXEL: StaticImage = StaticImage::new(
     &IMAGE_PNG,
     include_bytes!("../images/default_normal_pixel.png"),
 );
+
 static BLACK_PIXEL: StaticImage =
     StaticImage::new(&IMAGE_PNG, include_bytes!("../images/black_pixel.png"));
 
-fn image_fallback(requested_image_kind: PosterImageKind, error: bool) -> impl IntoResponse {
-    match requested_image_kind {
-        PosterImageKind::Albedo => {
-            if error {
-                ERROR_IMAGE.clone()
-            } else {
-                SAFE_IMAGE.clone()
-            }
+impl CannedImage {
+    fn image(&self, kind: PosterImageKind) -> StaticImage {
+        match kind {
+            PosterImageKind::Albedo => &self.albedo,
+            PosterImageKind::Emissive => self.emissive.as_ref().unwrap_or(&BLACK_PIXEL),
+            PosterImageKind::Normal => self.normal.as_ref().unwrap_or(&DEFAULT_NORMAL_PIXEL),
         }
-        PosterImageKind::Emissive => BLACK_PIXEL.clone(),
-        PosterImageKind::Normal => DEFAULT_NORMAL_PIXEL.clone(),
+        .clone()
     }
 }
+
+static YOTE_CANNED: CannedImage = CannedImage {
+    albedo: StaticImage::new(&IMAGE_WEBP, include_bytes!("../images/yote_albedo.webp")),
+    emissive: Some(StaticImage::new(
+        &IMAGE_WEBP,
+        include_bytes!("../images/yote_emissive.webp"),
+    )),
+    normal: Some(StaticImage::new(
+        &IMAGE_WEBP,
+        include_bytes!("../images/yote_normal.webp"),
+    )),
+};
+
+static ERROR_CANNED: CannedImage = CannedImage {
+    albedo: StaticImage::new(&IMAGE_WEBP, include_bytes!("../images/error.webp")),
+    emissive: None,
+    normal: None,
+};
+
+static FALLBACK_IMAGE: CannedImage = CannedImage {
+    albedo: StaticImage::new(&IMAGE_WEBP, include_bytes!("../images/safe.webp")),
+    emissive: None,
+    normal: None,
+};
 
 fn image_kind_deserializer<'de, D>(d: D) -> Result<PosterImageKind, D::Error>
 where
@@ -133,12 +151,16 @@ async fn handler(
     Path(token): Path<String>,
     Query(QueryArgs { image_kind }): Query<QueryArgs>,
 ) -> impl IntoResponse {
-    match handle_redirect_internal(&db, cache, config, Some(&token), image_kind.clone()).await {
-        Ok(Some(url)) => EitherResp::A(Redirect::to(&url)),
-        Ok(None) => EitherResp::B(image_fallback(image_kind, false)),
+    if token == "yote" {
+        return Either::E2(YOTE_CANNED.image(image_kind));
+    }
+
+    match handle_redirect_internal(&db, cache, config, &token, image_kind.clone()).await {
+        Ok(Some(url)) => Either::E1(Redirect::to(&url)),
+        Ok(None) => Either::E2(FALLBACK_IMAGE.image(image_kind)),
         Err(e) => {
             tracing::warn!("Error resolving redirect {}", e);
-            EitherResp::B(image_fallback(image_kind, true))
+            Either::E2(ERROR_CANNED.image(image_kind))
         }
     }
 }

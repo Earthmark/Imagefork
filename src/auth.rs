@@ -6,16 +6,66 @@ use oauth2::{
 };
 use reqwest::Url;
 use serde::Deserialize;
-use tracing::{info, warn};
+use sha2::{Digest, Sha256};
+use tracing::{info, instrument, warn};
 
 use crate::{
-    db::{creator::Creator, DbPool},
+    db::DbPool,
     reqs::{GithubApi, HttpClient},
 };
 
 pub const CSRF_STATE_KEY: &str = "oauth.csrf-state";
 
-impl AuthUser for Creator {
+#[derive(Clone, Debug)]
+pub struct CreatorToken {
+    pub id: i64,
+    pub email_hash: Vec<u8>,
+    pub moderator: bool,
+    pub lockout: bool,
+    pub poster_limit: i32,
+}
+
+impl CreatorToken {
+    #[instrument(skip(db))]
+    pub async fn get_by_email(db: &DbPool, email: &str) -> crate::error::Result<Option<Self>> {
+        Ok(sqlx::query_as!(
+            Self,
+            r#"
+        SELECT id, email_hash, moderator, lockout, poster_limit
+        FROM creators
+        WHERE email = $1
+        "#,
+            email
+        )
+        .fetch_optional(db)
+        .await?)
+    }
+
+    #[instrument(skip(db))]
+    pub async fn create_by_email(db: &DbPool, email: &str) -> crate::error::Result<Self> {
+        let mut hasher = Sha256::new();
+        hasher.update(email);
+        // TODO: Possibly make this random every time, because it's in the DB, we just need to generate this safely.
+        const SALT: &str = "Technically this is a valid salt... but it's quite long. w4htr5g[9o0jin12ukm2h,q3e4t5rwg2a-908[ihy2jure3gtj1h0[ds2vc2bj0mp3io[]";
+        hasher.update(SALT);
+        let hash = hasher.finalize().to_vec();
+
+        Ok(sqlx::query_as!(
+            Self,
+            r#"
+        INSERT INTO creators (email, email_hash)
+        VALUES ($1, $2)
+        RETURNING id, email_hash, moderator, lockout, poster_limit
+        "#,
+            email,
+            hash
+        )
+        .fetch_one(db)
+        .await?)
+    }
+}
+
+impl AuthUser for CreatorToken {
     type Id = i64;
 
     fn id(&self) -> Self::Id {
@@ -91,7 +141,7 @@ pub struct Credentials {
 
 #[async_trait]
 impl AuthnBackend for Backend {
-    type User = Creator;
+    type User = CreatorToken;
 
     type Credentials = Credentials;
 
@@ -124,12 +174,12 @@ impl AuthnBackend for Backend {
             .await?;
         let email = &emails[0].email;
 
-        let creator = if let Some(creator) = Creator::get_by_email(&self.db, email).await? {
+        let creator = if let Some(creator) = CreatorToken::get_by_email(&self.db, email).await? {
             info!("Existing user logged in.");
             creator
         } else {
             info!("Creating new user, as a login was attempted for an unknown email.",);
-            Creator::create_by_email(&self.db, email).await?
+            CreatorToken::create_by_email(&self.db, email).await?
         };
 
         Ok(Some(creator))
@@ -138,7 +188,7 @@ impl AuthnBackend for Backend {
     async fn get_user(&self, user_id: &UserId<Self>) -> Result<Option<Self::User>, Self::Error> {
         Ok(sqlx::query_as!(
             Self::User,
-            "SELECT id, email_hash FROM creators WHERE id = $1",
+            "SELECT id, email_hash, lockout, moderator, poster_limit FROM creators WHERE id = $1",
             user_id
         )
         .fetch_optional(&self.db)

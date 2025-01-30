@@ -1,15 +1,37 @@
-CREATE TABLE creators (
-    id BIGSERIAL PRIMARY KEY,
-    creation_time TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() at time zone 'utc'),
-    email TEXT NOT NULL UNIQUE,
-    email_hash BYTEA NOT NULL,
-    lockout BOOLEAN NOT NULL DEFAULT FALSE,
-    moderator BOOLEAN NOT NULL DEFAULT FALSE,
-    poster_limit INTEGER NOT NULL DEFAULT 3
+CREATE TABLE users (
+    id SERIAL,
+    name VARCHAR(255),
+    email VARCHAR(255),
+    image TEXT,
+    "emailVerified" TIMESTAMPTZ,
+    PRIMARY KEY (id)
 );
+CREATE TABLE accounts (
+    id SERIAL,
+    "userId" INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    type VARCHAR(255) NOT NULL,
+    provider VARCHAR(255) NOT NULL,
+    "providerAccountId" VARCHAR(255) NOT NULL,
+    refresh_token TEXT,
+    access_token TEXT,
+    expires_at BIGINT,
+    id_token TEXT,
+    scope TEXT,
+    session_state TEXT,
+    token_type TEXT,
+    PRIMARY KEY (id)
+);
+CREATE TABLE sessions (
+    id SERIAL,
+    "userId" INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    expires TIMESTAMPTZ NOT NULL,
+    sessionToken VARCHAR(255) NOT NULL,
+    PRIMARY KEY (id)
+);
+
 CREATE TABLE posters (
     id BIGSERIAL PRIMARY KEY,
-    creator BIGSERIAL NOT NULL REFERENCES creators (id) ON DELETE CASCADE,
+    "userId" BIGSERIAL NOT NULL REFERENCES creators (id) ON DELETE CASCADE,
     creation_time TIMESTAMP NOT NULL DEFAULT (now() at time zone 'utc'),
     stopped BOOLEAN NOT NULL DEFAULT TRUE,
     lockout BOOLEAN NOT NULL DEFAULT FALSE,
@@ -26,9 +48,4 @@ CREATE TABLE poster_image (
     kind texture_kind NOT NULL DEFAULT 'albedo',
     url TEXT NOT NULL,
     PRIMARY KEY (poster, kind)
-);
-CREATE TABLE sessions (
-    id TEXT PRIMARY KEY NOT NULL,
-    data BYTEA NOT NULL,
-    expiry_date TIMESTAMP NOT NULL
 );
