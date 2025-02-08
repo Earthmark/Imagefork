@@ -56,5 +56,13 @@ CREATE TABLE "poster_materials" (
     "posterId" INTEGER NOT NULL,
     "channel" TEXT DEFAULT 'albedo',
     "url" TEXT NOT NULL,
-    PRIMARY KEY (posterId, channel) FOREIGN KEY (posterId) REFERENCES posters(id) ON DELETE CASCADE
+    PRIMARY KEY (posterId, channel),
+    FOREIGN KEY (posterId) REFERENCES posters(id) ON DELETE CASCADE
+);
+CREATE TABLE "poster_tokens" (
+    "posterId" INTEGER,
+    "hash" TEXT NOT NULL,
+    "lastUsed" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY(hash),
+    FOREIGN KEY(posterId) REFERENCES posters(id) ON DELETE SET NULL
 );

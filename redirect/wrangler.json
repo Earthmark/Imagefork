@@ -7,7 +7,8 @@
 		"enabled": true
 	},
 	"vars": {
-		"REDIRECT_CACHE_SECONDS": "86400"
+		"REDIRECT_RESPONSE_CACHE_SECONDS": 3600,
+		"NO_BACKEND_SERVE": "FALSE"
 	},
 	"placement": { "mode": "smart" },
 	"d1_databases": [
