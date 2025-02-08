@@ -1,0 +1,24 @@
+{
+	"$schema": "../node_modules/wrangler/config-schema.json",
+	"name": "imagefork-redirect",
+	"main": "src/index.ts",
+	"compatibility_date": "2025-02-04",
+	"observability": {
+		"enabled": true
+	},
+	"vars": {
+		"REDIRECT_CACHE_SECONDS": "86400"
+	},
+	"placement": { "mode": "smart" },
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "imagefork",
+			"database_id": "b474463c-151e-4244-944d-41d466c96c07"
+		}
+	],
+	"assets": {
+		"directory": "./public/",
+		"binding": "ASSETS"
+	}
+}
