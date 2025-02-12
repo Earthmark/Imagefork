@@ -1,3 +1,7 @@
+import { zValidator } from '@hono/zod-validator';
+import { Hono } from 'hono';
+import { z } from 'zod';
+
 async function getHash(token: string): Promise<string> {
 	const encoder = new TextEncoder().encode(token);
 	const digest = await crypto.subtle.digest(
@@ -10,22 +14,7 @@ async function getHash(token: string): Promise<string> {
 	return digestBytes.map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-type GetPosterForTokenResult =
-	| {
-			// The token was bound to a poster, and it had a texture.
-			type: 'found';
-			url: string;
-	  }
-	| {
-			// The token was bound to a poster, but there was no texture.
-			type: 'no-texture';
-	  }
-	| {
-			// The token was not bound to a poster.
-			type: 'no-poster';
-	  };
-
-async function getUrlForToken(db: D1Database, token: string, channel: string): Promise<GetPosterForTokenResult> {
+async function getResponseForToken(db: D1Database, assets: Fetcher, token: string, channel: Channels): Promise<Response> {
 	const hash = await getHash(token);
 
 	const query = `
@@ -61,19 +50,37 @@ async function getUrlForToken(db: D1Database, token: string, channel: string): P
 	}
 
 	if (results.url) {
-		return {
-			type: 'found',
-			url: results.url,
-		};
+		return Response.redirect(results.url);
 	}
-	return {
-		type: results.has_poster ? 'no-texture' : 'no-poster',
-	};
+
+	const static_file = await BakedPosterRedirect(assets, results.has_poster ? DefaultChannelPoster : DefaultPoster, channel);
+	return new Response(static_file.body, static_file);
+}
+
+async function getResponseForId(db: D1Database, assets: Fetcher, id: string, channel: Channels): Promise<Response> {
+	const query = `
+	SELECT url
+	FROM poster_materials AS pm
+	WHERE pm.posterId = ?1
+	  AND pm.channel = ?2
+	;
+	`;
+	const results = await db.prepare(query).bind(id, channel).first<{
+		url: string;
+	}>();
+
+	if (results != null) {
+		return Response.redirect(results.url);
+	}
+
+	const static_file = await BakedPosterRedirect(assets, DefaultChannelPoster, channel);
+	return new Response(static_file.body, static_file);
 }
 
 type Channels = 'a' | 'e' | 'n';
-type BakedPoster = Record<Channels, string>;
+const channelsSchema = z.enum(['a', 'e', 'n']).default('a');
 
+type BakedPoster = Record<Channels, string>;
 const DefaultChannelPoster: BakedPoster = {
 	a: 'black_pixel.png',
 	e: 'black_pixel.png',
@@ -99,57 +106,56 @@ async function BakedPosterRedirect(assets: Fetcher, poster: BakedPoster, channel
 	return assets.fetch('http://fakehost/' + poster[channel]);
 }
 
-async function getResponse(assets: Fetcher, token_result: GetPosterForTokenResult, channel: Channels): Promise<Response> {
-	if (token_result.type == 'found') {
-		return Response.redirect(token_result.url);
+const app = new Hono<{
+	Bindings: Env;
+}>();
+
+app.get(
+	'/redirect/yote/:channel?',
+	zValidator(
+		'param',
+		z.object({
+			channel: channelsSchema,
+		})
+	),
+	async ({ req, env }) => {
+		const channel = req.valid('param').channel;
+		// Yote is a clean check poster, it should always be available.
+		return await BakedPosterRedirect(env.ASSETS, YotePoster, channel);
 	}
+);
 
-	const static_file = await BakedPosterRedirect(assets, token_result.type == 'no-texture' ? DefaultChannelPoster : DefaultPoster, channel);
-
-	return new Response(static_file.body, static_file);
-}
-
-export default {
-	async fetch(req, env, ctx): Promise<Response> {
+app.get(
+	'/redirect/:token/:channel?',
+	zValidator(
+		'param',
+		z.object({
+			token: z.string(),
+			channel: channelsSchema,
+		})
+	),
+	async ({ req, env, executionCtx }) => {
 		const cacheKey = new Request(req.url);
 		const cacheResp = await caches.default.match(cacheKey);
 		if (cacheResp) {
 			return cacheResp;
 		}
 
-		const url = new URL(req.url);
-		const path = url.pathname.split('/');
-
-		if (path.length < 3 || path[1] != 'redirect') {
-			return new Response('Not found', {
-				status: 404,
-			});
-		}
-		const token = path[2];
-		const channel = (path[3] as Channels) ?? 'a';
-
-		// Validate we actually have a valid channel.
-		if (!DefaultChannelPoster[channel]) {
-			return await BakedPosterRedirect(env.ASSETS, DefaultChannelPoster, 'a');
-		}
-
-		// Yote is a clean check poster, it should always be available.
-		if (token == 'yote') {
-			return await BakedPosterRedirect(env.ASSETS, YotePoster, channel);
-		}
-
-		// Circuit breaker to turn off backend serving, only returning default posters.
-		if (env.NO_BACKEND_SERVE.toUpperCase() == 'TRUE') {
-			return await BakedPosterRedirect(env.ASSETS, DefaultPoster, channel);
-		}
+		const token = req.valid('param').token;
+		const channel = req.valid('param').channel;
 
 		try {
-			const token_result = await getUrlForToken(env.DB, token, channel);
+			let response: Response | undefined;
 
-			const response = await getResponse(env.ASSETS, token_result, channel);
+			// Circuit breaker to turn off backend serving, only returning default posters.
+			if (env.NO_BACKEND_SERVE.toUpperCase() == 'TRUE') {
+				response = await BakedPosterRedirect(env.ASSETS, DefaultPoster, channel);
+			} else {
+				response = await getResponseForToken(env.DB, env.ASSETS, token, channel);
+			}
 
 			response.headers.append('Cache-Control', 's-maxage=' + env.REDIRECT_RESPONSE_CACHE_SECONDS);
-			ctx.waitUntil(caches.default.put(cacheKey, response.clone()));
+			executionCtx.waitUntil(caches.default.put(cacheKey, response.clone()));
 			return response;
 		} catch (except) {
 			console.log(except);
@@ -158,5 +164,32 @@ export default {
 			response.status = 500;
 			return response;
 		}
-	},
-} satisfies ExportedHandler<Env>;
+	}
+);
+
+app.get(
+	'/poster/:poster/:channel?',
+	zValidator(
+		'param',
+		z.object({
+			poster: z.string(),
+			channel: channelsSchema,
+		})
+	),
+	async ({ req, env }) => {
+		const poster = req.valid('param').poster;
+		const channel = req.valid('param').channel;
+
+		try {
+			return await getResponseForId(env.DB, env.ASSETS, poster, channel);
+		} catch (except) {
+			console.log(except);
+			let response = await BakedPosterRedirect(env.ASSETS, ErrorPoster, channel);
+			response = new Response(response.body, response);
+			response.status = 500;
+			return response;
+		}
+	}
+);
+
+export default app;

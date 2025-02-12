@@ -15,7 +15,8 @@
 		{
 			"binding": "DB",
 			"database_name": "imagefork",
-			"database_id": "b474463c-151e-4244-944d-41d466c96c07"
+			"database_id": "b474463c-151e-4244-944d-41d466c96c07",
+			"migrations_dir": "../migrations"
 		}
 	],
 	"assets": {

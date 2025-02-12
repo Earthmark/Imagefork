@@ -1,15 +1,16 @@
 -- Migration number: 0001 	 2025-02-08T05:05:08.258Z
-CREATE TABLE IF NOT EXISTS "users" (
-    "id" INTEGER NOT NULL DEFAULT '',
+CREATE TABLE "users" (
+    "id" TEXT NOT NULL DEFAULT '',
     "name" TEXT DEFAULT NULL,
     "email" TEXT DEFAULT NULL,
     "emailVerified" DATETIME DEFAULT NULL,
     "image" TEXT DEFAULT NULL,
+    "poster_limit" NUMBER DEFAULT 3,
     PRIMARY KEY (id)
 );
-CREATE TABLE IF NOT EXISTS "accounts" (
-    "id" INTEGER NOT NULL,
-    "userId" INTEGER NOT NULL DEFAULT NULL,
+CREATE TABLE "accounts" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL DEFAULT NULL,
     "type" TEXT NOT NULL DEFAULT NULL,
     "provider" TEXT NOT NULL DEFAULT NULL,
     "providerAccountId" TEXT NOT NULL DEFAULT NULL,
@@ -25,15 +26,15 @@ CREATE TABLE IF NOT EXISTS "accounts" (
     PRIMARY KEY (id),
     FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
 );
-CREATE TABLE IF NOT EXISTS "sessions" (
-    "id" INTEGER NOT NULL,
+CREATE TABLE "sessions" (
+    "id" TEXT NOT NULL,
     "sessionToken" TEXT NOT NULL,
-    "userId" INTEGER NOT NULL DEFAULT NULL,
+    "userId" TEXT NOT NULL DEFAULT NULL,
     "expires" DATETIME NOT NULL DEFAULT NULL,
     PRIMARY KEY (sessionToken),
     FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
 );
-CREATE TABLE IF NOT EXISTS "verification_tokens" (
+CREATE TABLE "verification_tokens" (
     "identifier" TEXT NOT NULL,
     "token" TEXT NOT NULL DEFAULT NULL,
     "expires" DATETIME NOT NULL DEFAULT NULL,
@@ -41,7 +42,7 @@ CREATE TABLE IF NOT EXISTS "verification_tokens" (
 );
 CREATE TABLE "posters" (
     "id" INTEGER NOT NULL,
-    "userId" INTEGER NOT NULL,
+    "userId" TEXT NOT NULL,
     "creationTime" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "active" boolean NOT NULL DEFAULT FALSE,
     "lockout" boolean NOT NULL DEFAULT FALSE,
@@ -54,7 +55,7 @@ CREATE TABLE "posters" (
 );
 CREATE TABLE "poster_materials" (
     "posterId" INTEGER NOT NULL,
-    "channel" TEXT DEFAULT 'albedo',
+    "channel" TEXT DEFAULT 'a',
     "url" TEXT NOT NULL,
     PRIMARY KEY (posterId, channel),
     FOREIGN KEY (posterId) REFERENCES posters(id) ON DELETE CASCADE
