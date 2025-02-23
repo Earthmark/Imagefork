@@ -1,14 +1,16 @@
 {
   "Login": {
     "login": "Login",
-    "login-via-github": "Sign in with Github"
-  },
-  "About": {
+    "login-via-github": "Sign in with Github",
     "title": "Imagefork",
     "subtitle": "Resonite poster network",
     "announce-in-worlds": "Announce your events directly in Sessions!"
   },
   "Loading": {
     "content": "Loading..."
+  },
+  "Dash": {
+    "title": "Imagefork",
+    "logout": "logout"
   }
 }

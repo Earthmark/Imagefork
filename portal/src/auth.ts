@@ -1,10 +1,14 @@
 import NextAuth from "next-auth";
 import { D1Adapter } from "@auth/d1-adapter";
 import GitHub from "next-auth/providers/github";
+import { unauthorized } from "next/navigation";
 
 export async function authUserId(){
   const session = await auth();
   const userId = session?.user?.id;
+  if (!userId) {
+    unauthorized();
+  }
   return userId;
 }
 

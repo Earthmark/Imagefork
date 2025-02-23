@@ -4,6 +4,8 @@ import { Inter } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import { auth } from "@/auth";
+import Login from "@/components/Login";
+import Dash from "@/components/Dash";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -25,7 +27,7 @@ export default async function RootLayout({
     <html lang={locale}>
       <body className={inter.className}>
         <NextIntlClientProvider messages={messages}>
-          {children}
+          {session ? <Dash>{children}</Dash> : <Login />}
         </NextIntlClientProvider>
       </body>
     </html>

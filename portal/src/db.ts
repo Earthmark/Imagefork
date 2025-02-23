@@ -1,6 +1,13 @@
+"use server";
+
+import { getRequestContext } from "@cloudflare/next-on-pages";
 import { authUserId } from "./auth";
 
-type PosterMetadata = {
+function db() {
+  return getRequestContext().env.DB;
+}
+
+export type PosterMetadata = {
   id: number;
   userId: string;
   creationTime: string;
@@ -9,22 +16,17 @@ type PosterMetadata = {
   servable: boolean;
 };
 
-export async function getPosters(
-  db: D1Database
-): Promise<Array<PosterMetadata>> {
+export async function getPosters(): Promise<Array<PosterMetadata>> {
   const userId = await authUserId();
 
-  if (userId == undefined) {
-    return [];
-  }
-
-  const posterInfo = await db
+  const posterInfo = await db()
     .prepare(
       `
       SELECT
         id, creationTime, active, lockout, servable
       FROM posters AS p
       WHERE userId = ?1
+      ORDER BY creationTime
       `
     )
     .bind(userId)
@@ -32,32 +34,26 @@ export async function getPosters(
   return posterInfo.results;
 }
 
-export async function createPoster(
-  db: D1Database
-): Promise<PosterMetadata | null> {
+export async function createPoster(): Promise<PosterMetadata | null> {
   const userId = await authUserId();
 
-  if (userId == undefined) {
-    return null;
-  }
-
-  const posterInfo = await db
+  const posterInfo = await db()
     .prepare(
       `
         INSERT INTO posters (userId)
-        SELECT ?1
-        WHERE (
-          SELECT (
-            poster_limit - (
-              SELECT COUNT(*)
-              FROM posters
-              WHERE userId = ?1
-            ) > 0
-          FROM users
-          WHERE id = ?1
-        )
+        SELECT u.id AS userId
+        FROM users AS u
+        WHERE u.id = $1
+        AND NOT u.lockout
+        AND (
+            u.poster_limit - (
+                SELECT COUNT(*)
+                FROM posters AS p
+                WHERE p.userId = u.id
+            )
+        ) > 0
         RETURNING
-          id, creationTime, active, lockout, servable
+            id, creationTime, active, lockout, servable
         `
     )
     .bind(userId)
@@ -66,17 +62,10 @@ export async function createPoster(
   return posterInfo;
 }
 
-export async function deletePoster(
-  db: D1Database,
-  posterId: string
-): Promise<boolean> {
+export async function deletePoster(posterId: string): Promise<boolean> {
   const userId = await authUserId();
 
-  if (userId == undefined) {
-    return false;
-  }
-
-  const result = await db
+  const result = await db()
     .prepare(
       `
         DELETE FROM posters 
@@ -89,28 +78,21 @@ export async function deletePoster(
   return result.success;
 }
 
-type Channel = "a" | "e" | "n";
+export type Channel = "a" | "e" | "n";
 
-type PosterMaterial = {
+export type PosterMaterial = {
   channel: Channel;
   url: string;
 };
 
-type PosterInfo = {
+export type PosterInfo = {
   materials: Array<PosterMaterial>;
 } & PosterMetadata;
 
-export async function getPoster(
-  db: D1Database,
-  posterId: string
-): Promise<PosterInfo | null> {
+export async function getPoster(posterId: string): Promise<PosterInfo | null> {
   const userId = await authUserId();
 
-  if (userId == undefined) {
-    return null;
-  }
-
-  const posterInfoP = db
+  const posterInfoP = db()
     .prepare(
       `
       SELECT
@@ -122,7 +104,7 @@ export async function getPoster(
     .bind(posterId, userId)
     .first<PosterMetadata>();
 
-  const posterMaterialsP = db
+  const posterMaterialsP = db()
     .prepare(
       `
       SELECT
@@ -130,6 +112,7 @@ export async function getPoster(
       FROM posters AS p
       INNER JOIN poster_materials AS pm ON p.id = pm.posterId
       WHERE p.id = ?1 AND p.userId = ?2
+      ORDER BY channel
       `
     )
     .bind(posterId, posterId)

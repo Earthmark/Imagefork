@@ -1,6 +1,5 @@
 import { auth, signIn } from "@/auth";
 import { getPoster } from "@/db";
-import { getRequestContext } from "@cloudflare/next-on-pages";
 
 export default async function Page({
   params,
@@ -15,9 +14,7 @@ export default async function Page({
   }
 
   const posterId = (await params).id;
-  const { env } = getRequestContext();
-
-  const p = getPoster(env.DB, posterId);
+  const poster = await getPoster(posterId);
 
   return <></>;
 }
