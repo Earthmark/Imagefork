@@ -14,7 +14,7 @@ export default async function Page({
   }
 
   const posterId = (await params).id;
-  const poster = await getPoster(posterId);
+  await getPoster(posterId);
 
   return <></>;
 }

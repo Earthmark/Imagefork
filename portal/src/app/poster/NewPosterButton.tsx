@@ -9,6 +9,7 @@ export default function NewPosterButton({
   disabled: boolean;
   createPoster(): void;
 }) {
+  // eslint-disable-next-line no-unused-vars
   const [_, formAction, pending] = useActionState(createPoster, null);
 
   console.log("rendered child");

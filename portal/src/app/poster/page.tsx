@@ -1,5 +1,4 @@
 import { getPosters, createPoster, PosterMetadata } from "@/db";
-import { getRequestContext } from "@cloudflare/next-on-pages";
 import NewPosterButton from "./NewPosterButton";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -17,7 +16,8 @@ function StatusBadge({ poster }: { poster: PosterMetadata }) {
 
 export default async function Page() {
   const posters = await getPosters();
-  const posterLimit = getRequestContext().env.POSTER_LIMIT;
+  // TODO: Get this from the user.
+  const posterLimit = 3;
 
   return (
     <div className="card w-full p-6 bg-base-100 shadow-xl mt-2">

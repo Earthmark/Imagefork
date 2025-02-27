@@ -27,7 +27,7 @@ export default async function RootLayout({
     <html lang={locale}>
       <body className={inter.className}>
         <NextIntlClientProvider messages={messages}>
-          {session ? <Dash>{children}</Dash> : <Login />}
+          {session?.user?.id ? <Dash>{children}</Dash> : <Login />}
         </NextIntlClientProvider>
       </body>
     </html>
